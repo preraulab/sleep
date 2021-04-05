@@ -87,7 +87,7 @@ data_noartifact = data;
 data_noartifact(isartifact) = nan;
 
 [spect, stimes, sfreqs] = ...
-    multitaper_spectrogram_mex(data_noartifact,Fs,SO_freq_range, taper_params, window_params, min_NFFT, detrend_opt, false, false);
+    multitaper_spectrogram_mex(data_noartifact,Fs,SO_freq_range, taper_params, window_params, min_NFFT, detrend_opt, [], false, false, true);
 df = sfreqs(2)-sfreqs(1);
 
 %Fix bad values
