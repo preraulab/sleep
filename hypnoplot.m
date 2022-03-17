@@ -122,5 +122,10 @@ end
 uistack(sh,'top');
 
 %Set the proper limits
-xlim(time([1 end-1]));
+if length(time) == 2
+    xlim(time([1 end]));
+else
+    xlim(time([1 end-1]));
+end
+
 ylim([min_y max_y]);
