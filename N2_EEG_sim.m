@@ -1,15 +1,39 @@
-function signal = N2_EEG_sim(Fs, total_time, phase_pref)
+function signal = N2_EEG_sim(Fs, total_time, phase_pref, spindle_baseline, modulation_factor, spindle_min_separation, alpha_exp)
 if nargin == 0
     Fs = 200;
-    total_time = 60*60*5;
-    N2_EEG_sim(Fs, total_time, 0);
+    total_time = 3600*2;
+    phase_pref = pi/2;
+    N2_EEG_sim(Fs, total_time, phase_pref);
     return;
+end
+
+%Set phase pref and max prob
+if nargin<3 || isempty(phase_pref)
+    phase_pref = pi;
+end
+
+if nargin<4 || isempty(spindle_baseline)
+    spindle_baseline = 1;
+end
+
+%Modulation factor for cosine tuning
+if nargin<5 || isempty(modulation_factor)
+    modulation_factor = 20;
+end
+
+%Set min spacing between events
+if nargin<6 || isempty(spindle_min_separation)
+spindle_min_separation = 1;
+end
+
+%Set 1/f^alpha
+if nargin<7 || isempty(alpha_exp)
+    alpha_exp = 1.5;
 end
 
 %Total number of time points
 N = total_time*Fs;
 t = (1:N)/Fs;
-
 
 %% Generate K-Complexes
 K_complexes = zeros(1,N);
@@ -50,8 +74,7 @@ slow_rnd([1 end]) = 0; %Keep spline well-behaved
 %Interpolate the noise to make a slow component
 slow = interp1(linspace(1,N,length(slow_rnd)),slow_rnd,1:N,'spline');
 
-
-%Create low-res random ~1Hz noise
+%Create low-res random ~5Hz noise
 delta_rnd = randn(1,N/60/Fs*120*5)*1;
 delta_rnd([1 end]) = 0; %Keep spline well-behaved
 
@@ -62,45 +85,36 @@ delta = interp1(linspace(1,N,length(delta_rnd)),delta_rnd,1:N,'spline');
 %1/f^alpha
 alpha_exp = 1.5;
 
-cn = dsp.ColoredNoise('SamplesPerFrame',N, 'InverseFrequencyPower', alpha_exp);
+cn = dsp.ColoredNoise('SamplesPerFrame', N, 'InverseFrequencyPower', alpha_exp);
 noise = cn();
 
+%% Create baseline signal and compute slow oscillation
 %Create signal and zero mean
 signal = K_complexes + slow + delta + noise';
+
+%Set random SO-pow by filtering white noise at SO range
+SO_power = quickbandpass(signal,Fs,[.3 1.5]);
 
 
 %% Generate spindles
 spindles = zeros(1,N);
 
-%Set phase pref and max prob
-if nargin<3 || isempty(phase_pref)
-phase_pref = pi;
-end
-
-%Set spindle rate (events/minute) to be lambda of a Poisson process
-spindle_density = 15;
-
-%Set random SO-pow by filtering white noise at SO range
-SO_power = quickbandpass(signal,Fs,[.3 1.5]);
-
 %Extract SO-phase
 SO_phase = angle(hilbert(SO_power));
 
-%Set peak probability
-prob_peak = cos(SO_phase-phase_pref)/2 + .5;
+%Set spindle density
+prob_peak =  modulation_factor*cos(SO_phase-phase_pref);
 
 %Generate Poisson events
-spindle_inds = poissrnd(prob_peak/Fs/60*spindle_density*2,1,N)>0;
+spindle_inds = poissrnd(prob_peak/Fs/60 + spindle_baseline/Fs/60,1,N)>0;
 spindle_times = find(spindle_inds);
-spindle_phase = SO_phase(spindle_inds);
 
-%Set min spacing between events
-spindle_min_separation = 3;
+last_good_spindle = -inf;
 
 %Loop through all events and generate spindles
 for ii = 1:length(spindle_times)
     %Check for overlap
-    if ii>1 && (spindle_times(ii) - spindle_times(ii-1))/Fs > spindle_min_separation
+    if ii>1 && (spindle_times(ii) - last_good_spindle)/Fs > spindle_min_separation
 
         %Simulate spindle waveform
         spindle_duration = rand*1.5 + .5;
@@ -114,8 +128,15 @@ for ii = 1:length(spindle_times)
         start_ind = max(spindle_times(ii) - round(spindle_duration/2)*Fs,1);
         inds = start_ind:min((start_ind+length(spindle)-1), N);
         spindles(inds) = spindles(inds) + spindle(1:length(inds));
+
+        last_good_spindle = spindle_times(ii);
+    else
+        spindle_times(ii) = nan;
     end
 end
+
+spindle_times = spindle_times(~isnan(spindle_times));
+spindle_phase = SO_phase(spindle_times);
 
 signal = signal + spindles;
 signal = signal - mean(signal);
@@ -123,7 +144,7 @@ signal = signal - mean(signal);
 %% Plot signal
 close all;
 figure
-[theta_mean, rho_mean, h_phist, h_pax, h_ml] = phasehistogram(spindle_phase,1,'NumBins',25);
+[theta_mean, ~, ~, h_pax, ~] = phasehistogram(spindle_phase,1);
 set(h_pax,'position',[0.7256    0.3159    0.2967    0.3840]);
 title(['Theta: ' num2str(theta_mean)])
 
