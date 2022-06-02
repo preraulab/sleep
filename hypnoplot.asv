@@ -63,10 +63,6 @@ inds=[1 find(diff(stage)~=0)+1 length(time)];
 time=time(inds);
 stage=stage(inds);
 
-%Force all low/high stages to be undef/artifact respectively
-stage(stage<0) = 0;
-stage(stage>6) = 6;
-
 %Create hypnogram labes
 hypnogram_labels={'Undef','N3','N2','N1','REM','Wake','Art'};
 
