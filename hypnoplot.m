@@ -64,7 +64,7 @@ time=time(inds);
 stage=stage(inds);
 
 %Force all low/high stages to be undef/artifact respectively
-stage(stage<0) = 0;
+stage(stage<0 | isnan(stage)) = 0;
 stage(stage>6) = 6;
 
 %Create hypnogram labes
