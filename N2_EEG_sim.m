@@ -3,7 +3,7 @@ if nargin == 0
     Fs = 200;
     total_time = 3600*2;
     phase_pref = pi/2;
-    N2_EEG_sim(Fs, total_time, phase_pref);
+    signal = N2_EEG_sim(Fs, total_time, phase_pref);
     return;
 end
 
