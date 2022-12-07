@@ -1,4 +1,4 @@
-function signal = N2_EEG_sim(Fs, total_time, phase_pref, spindle_baseline, modulation_factor, spindle_min_separation, alpha_exp)
+function signal = N2_EEG_sim(Fs, total_time, phase_pref, spindle_baseline, modulation_factor, spindle_min_separation, alpha_exp, plot_on)
 if nargin == 0
     Fs = 200;
     total_time = 3600*2;
@@ -23,12 +23,16 @@ end
 
 %Set min spacing between events
 if nargin<6 || isempty(spindle_min_separation)
-spindle_min_separation = 1;
+    spindle_min_separation = 1;
 end
 
 %Set 1/f^alpha
 if nargin<7 || isempty(alpha_exp)
     alpha_exp = 1.5;
+end
+
+if nargin<8
+    plot_on = false;
 end
 
 %Total number of time points
@@ -68,14 +72,14 @@ end
 %% Generate "slow" and "delta" waveforms by spline interpolation
 
 %Create low-res random ~1Hz noise
-slow_rnd = randn(1,N/60/Fs*120)*2;
+slow_rnd = randn(1,round(N/60/Fs*120))*2;
 slow_rnd([1 end]) = 0; %Keep spline well-behaved
 
 %Interpolate the noise to make a slow component
 slow = interp1(linspace(1,N,length(slow_rnd)),slow_rnd,1:N,'spline');
 
 %Create low-res random ~5Hz noise
-delta_rnd = randn(1,N/60/Fs*120*5)*1;
+delta_rnd = randn(1,round(N/60/Fs*120*5))*1;
 delta_rnd([1 end]) = 0; %Keep spline well-behaved
 
 %Interpolate the noise to make a slow component
@@ -142,25 +146,27 @@ signal = signal + spindles;
 signal = signal - mean(signal);
 
 %% Plot signal
-close all;
-figure
-[theta_mean, ~, ~, h_pax, ~] = phasehistogram(spindle_phase,1);
-set(h_pax,'position',[0.7256    0.3159    0.2967    0.3840]);
-title(['Theta: ' num2str(theta_mean)])
+if plot_on
+    close all;
+    figure
+    [theta_mean, ~, ~, h_pax, ~] = phasehistogram(spindle_phase,1);
+    set(h_pax,'position',[0.7256    0.3159    0.2967    0.3840]);
+    title(['Theta: ' num2str(theta_mean)])
 
-ax = figdesign(1,1,'orient','landscape','margin',[.1 .1 .05, .3  .03]);
-ax_split = split_axis(ax,[.2 .2 .6],1);
-axes(ax_split(3))
-multitaper_spectrogram_mex(signal, Fs, [.5 35],[2 3], [1.5 .05], 2^10,'constant');climscale; colormap(jet);
-axes(ax_split(2))
-plot(t,signal)
-axes(ax_split(1))
-plot(t,SO_power)
-linkaxes(ax_split,'x')
+    ax = figdesign(1,1,'orient','landscape','margin',[.1 .1 .05, .3  .03]);
+    ax_split = split_axis(ax,[.2 .2 .6],1);
+    axes(ax_split(3))
+    multitaper_spectrogram_mex(signal, Fs, [.5 35],[2 3], [1.5 .05], 2^10,'constant');climscale; colormap(jet);
+    axes(ax_split(2))
+    plot(t,signal)
+    axes(ax_split(1))
+    plot(t,SO_power)
+    linkaxes(ax_split,'x')
 
 
 
-scrollzoompan(ax_split(2));
+    scrollzoompan(ax_split(2));
 
-set(gcf,'units','normalized','position',[0 0 1 1]);
+    set(gcf,'units','normalized','position',[0 0 1 1]);
+end
 end
