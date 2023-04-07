@@ -1,4 +1,6 @@
-function [signal, spindle_times, spindle_phase] = N2_EEG_sim(Fs, total_time, phase_pref, spindle_freq_mean, spindle_freq_std, spindle_baseline_rate, modulation_factor, spindle_min_separation, alpha_exp, plot_on)
+function [signal, spindle_times, spindle_phase] = N2_EEG_sim(Fs, total_time, phase_pref, ...
+    spindle_freq_mean, spindle_freq_std, spindle_amp_mean, spindle_amp_std, spindle_dur_mean, spindle_dur_std,...
+    spindle_baseline_rate, modulation_factor, spindle_min_separation, alpha_exp, plot_on)
 %Create a sample to run as default
 if nargin == 0
     Fs = 200;
@@ -19,29 +21,47 @@ end
 
 %Modulation factor for cosine tuning
 if nargin<5 || isempty(spindle_freq_std)
-    spindle_freq_std = .5;
+    spindle_freq_std = 1;
 end
 
-if nargin<6 || isempty(spindle_baseline_rate)
+if nargin<4 || isempty(spindle_amp_mean)
+    spindle_amp_mean = 5;
+end
+
+%Modulation factor for cosine tuning
+if nargin<6 || isempty(spindle_amp_std)
+    spindle_amp_std = .5;
+end
+
+if nargin<7 || isempty(spindle_dur_mean)
+    spindle_dur_mean = 1.5;
+end
+
+%Modulation factor for cosine tuning
+if nargin<8 || isempty(spindle_dur_std)
+    spindle_dur_std = .25;
+end
+
+if nargin<9 || isempty(spindle_baseline_rate)
     spindle_baseline_rate = 10;
 end
 
 %Modulation factor for cosine tuning
-if nargin<7 || isempty(modulation_factor)
+if nargin<10 || isempty(modulation_factor)
     modulation_factor = 40;
 end
 
 %Set min spacing between events
-if nargin<8 || isempty(spindle_min_separation)
+if nargin<11 || isempty(spindle_min_separation)
     spindle_min_separation = 0.5;
 end
 
 %Set 1/f^alpha
-if nargin<9 || isempty(alpha_exp)
+if nargin<12 || isempty(alpha_exp)
     alpha_exp = 1.5;
 end
 
-if nargin<10
+if nargin<13
     plot_on = true;
 end
 
@@ -140,9 +160,9 @@ for ii = 1:length(spindle_inds)
     %Check for overlap
     if ii>1 && (spindle_inds(ii) - last_spindle_time)/Fs > spindle_min_separation
         %Simulate spindle waveform
-        spindle_duration = rand*1.5 + .5;
-        spindle_amp = rand*5 + 5;
-        spindle_freq = spindle_freq_mean + randn*spindle_freq_std;
+        spindle_duration = max(spindle_dur_mean + randn*spindle_dur_std,0);
+        spindle_amp = max(spindle_amp_mean + randn*spindle_amp_std, 0);
+        spindle_freq = max(spindle_freq_mean + randn*spindle_freq_std,0);
 
         sp_t = linspace(0,spindle_duration,spindle_duration*Fs);
         spindle = sin(2*pi*sp_t*spindle_freq) .* hanning(length(sp_t))'*spindle_amp;
