@@ -1,6 +1,6 @@
-function [signal, spindle_times, spindle_phase] = N2_EEG_sim(Fs, total_time, phase_pref, ...
+function [signal, spindle_times, spindle_freqs, spindle_amps, spindle_durations, spindle_phase] = N2_EEG_sim(Fs, total_time, phase_pref, ...
     spindle_freq_mean, spindle_freq_std, spindle_amp_mean, spindle_amp_std, spindle_dur_mean, spindle_dur_std,...
-    spindle_baseline_rate, modulation_factor, spindle_min_separation, alpha_exp, plot_on)
+    spindle_baseline_rate, modulation_factor, spindle_min_separation, alpha_exp, noise_factor, plot_on)
 %N2_EEG_SIM Simulates N2 sleep stage EEG signals with spindle and K-complex events
 %
 % [signal, spindle_times, spindle_phase] = N2_EEG_sim(Fs, total_time, phase_pref, spindle_freq_mean, spindle_freq_std, spindle_amp_mean, spindle_amp_std, spindle_dur_mean, spindle_dur_std, spindle_baseline_rate, modulation_factor, spindle_min_separation, alpha_exp, plot_on)
@@ -19,6 +19,7 @@ function [signal, spindle_times, spindle_phase] = N2_EEG_sim(Fs, total_time, pha
 % - modulation_factor: Modulation factor for cosine tuning of spindle events (default: 40)
 % - spindle_min_separation: Minimum separation between spindle events in seconds (default: 0.5)
 % - alpha_exp: Exponent of the 1/f^alpha colored noise (default: 1.5)
+% - noise_factor: Noise multiplier (default: 3)
 % - plot_on: Boolean flag to plot the generated signal or not (default: true)
 %
 % Outputs:
@@ -33,7 +34,7 @@ function [signal, spindle_times, spindle_phase] = N2_EEG_sim(Fs, total_time, pha
 % phase_pref = -3*pi/4;
 % signal = N2_EEG_sim(Fs, total_time, phase_pref);
 %
-%    Copyright 2023 Michael J. Prerau Laboratory. - http://www.sleepEEG.org
+%    Copyright 2021 Michael J. Prerau Laboratory. - http://www.sleepEEG.org
 %    Authors: Michael J. Prerau, Ph.D.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -41,11 +42,12 @@ function [signal, spindle_times, spindle_phase] = N2_EEG_sim(Fs, total_time, pha
 if nargin == 0
     %Create 1 hour of data
     Fs = 200;
-    
+
     total_time = 3600;
     phase_pref = -3*pi/4;
 
-    signal = N2_EEG_sim(Fs, total_time, phase_pref);
+    [signal, spindle_times, spindle_freqs, spindle_amps, spindle_durations, spindle_phase] = N2_EEG_sim(Fs, total_time, phase_pref);
+
     return;
 end
 
@@ -100,7 +102,13 @@ if nargin<12 || isempty(alpha_exp)
     alpha_exp = 1.5;
 end
 
-if nargin<13
+%Set 1/f^alpha
+if nargin<13 || isempty(noise_factor)
+    noise_factor = 3;
+end
+
+%Turn plot on/off
+if nargin<14
     plot_on = true;
 end
 
@@ -157,7 +165,7 @@ delta = interp1(linspace(1,N,length(delta_rnd)),delta_rnd,1:N,'spline');
 %1/f^alpha
 
 cn = dsp.ColoredNoise('SamplesPerFrame', N, 'InverseFrequencyPower', alpha_exp);
-noise = cn()*3;
+noise = cn()*noise_factor;
 
 %% Create baseline signal and compute slow oscillation
 %Create signal and zero mean
@@ -193,6 +201,10 @@ lambda_peak = modulation_factor*cos(SO_phase-phase_pref);
 spindle_inds = poissrnd((lambda_peak + spindle_baseline_rate)/Fs/60,1,N)>0;
 spindle_inds = find(spindle_inds);
 
+spindle_durations = nan(1,length(spindle_inds));
+spindle_amps = nan(1,length(spindle_inds));
+spindle_freqs = nan(1,length(spindle_inds));
+
 %Loop through all events and generate spindles
 last_spindle_time = spindle_inds(1);
 for ii = 1:length(spindle_inds)
@@ -211,18 +223,26 @@ for ii = 1:length(spindle_inds)
         inds = start_ind:min((start_ind+length(spindle)-1), N);
         spindles(inds) = spindles(inds) + spindle(1:length(inds));
         last_spindle_time = spindle_inds(ii);
+
+        spindle_durations(ii) = spindle_duration;
+        spindle_amps(ii) = spindle_amp;
+        spindle_freqs(ii) = spindle_freq;
+
     elseif ii>1
         spindle_inds(ii) = nan;
     end
 end
 
+spindle_freqs = spindle_freqs(~isnan(spindle_freqs));
+spindle_amps = spindle_amps(~isnan(spindle_amps));
+spindle_durations = spindle_durations(~isnan(spindle_durations));
 spindle_inds = spindle_inds(~isnan(spindle_inds));
 spindle_phase = SO_phase(spindle_inds);
 
 %Add spindles to the signal
 signal = signal + spindles;
 
-%Convert spindle inds into times 
+%Convert spindle inds into times
 spindle_times = spindle_inds/Fs;
 
 %% Plot signal
@@ -261,7 +281,7 @@ if plot_on
     axes(ax_split(1))
     yyaxis left;
     plot(t,SO_power);
-    
+
     yyaxis right;
     plot(t, SO_phase)
     set(gca,'ytick',[-1 -1/2 0 1/2 1]*pi,'yticklabel',{'-\pi' '-\pi/2' '0' '\pi/2' '\pi'});
