@@ -1,8 +1,8 @@
-function [signal, spindle_times, spindle_phase] = N2_EEG_sim(Fs, total_time, phase_pref, spindle_freq, spindle_std, spindle_baseline_rate, modulation_factor, spindle_min_separation, alpha_exp, plot_on)
+function [signal, spindle_times, spindle_phase] = N2_EEG_sim(Fs, total_time, phase_pref, spindle_freq_mean, spindle_freq_std, spindle_baseline_rate, modulation_factor, spindle_min_separation, alpha_exp, plot_on)
 %Create a sample to run as default
 if nargin == 0
     Fs = 200;
-    total_time = 3600*.5;
+    total_time = 3600;
     phase_pref = pi/2;
     signal = N2_EEG_sim(Fs, total_time, phase_pref);
     return;
@@ -13,13 +13,13 @@ if nargin<3 || isempty(phase_pref)
     phase_pref = pi;
 end
 
-if nargin<4 || isempty(spindle_freq)
-    spindle_freq = 15;
+if nargin<4 || isempty(spindle_freq_mean)
+    spindle_freq_mean = 15;
 end
 
 %Modulation factor for cosine tuning
-if nargin<5 || isempty(spindle_std)
-    spindle_std = .5;
+if nargin<5 || isempty(spindle_freq_std)
+    spindle_freq_std = .5;
 end
 
 if nargin<6 || isempty(spindle_baseline_rate)
@@ -142,7 +142,7 @@ for ii = 1:length(spindle_inds)
         %Simulate spindle waveform
         spindle_duration = rand*1.5 + .5;
         spindle_amp = rand*5 + 5;
-        spindle_freq = spindle_freq + randn*spindle_std;
+        spindle_freq = spindle_freq_mean + randn*spindle_freq_std;
 
         sp_t = linspace(0,spindle_duration,spindle_duration*Fs);
         spindle = sin(2*pi*sp_t*spindle_freq) .* hanning(length(sp_t))'*spindle_amp;
