@@ -1,4 +1,4 @@
-function [signal, spindle_times, spindle_phase] = N2_EEG_sim(Fs, total_time, phase_pref, spindle_baseline, modulation_factor, spindle_min_separation, alpha_exp, plot_on)
+function [signal, spindle_times, spindle_phase] = N2_EEG_sim(Fs, total_time, phase_pref, spindle_freq, spindle_std, spindle_baseline_rate, modulation_factor, spindle_min_separation, alpha_exp, plot_on)
 %Create a sample to run as default
 if nargin == 0
     Fs = 200;
@@ -13,26 +13,35 @@ if nargin<3 || isempty(phase_pref)
     phase_pref = pi;
 end
 
-if nargin<4 || isempty(spindle_baseline)
-    spindle_baseline = 10;
+if nargin<4 || isempty(spindle_freq)
+    spindle_freq = 15;
 end
 
 %Modulation factor for cosine tuning
-if nargin<5 || isempty(modulation_factor)
+if nargin<5 || isempty(spindle_std)
+    spindle_std = .5;
+end
+
+if nargin<6 || isempty(spindle_baseline_rate)
+    spindle_baseline_rate = 10;
+end
+
+%Modulation factor for cosine tuning
+if nargin<7 || isempty(modulation_factor)
     modulation_factor = 40;
 end
 
 %Set min spacing between events
-if nargin<6 || isempty(spindle_min_separation)
+if nargin<8 || isempty(spindle_min_separation)
     spindle_min_separation = 0.5;
 end
 
 %Set 1/f^alpha
-if nargin<7 || isempty(alpha_exp)
+if nargin<9 || isempty(alpha_exp)
     alpha_exp = 1.5;
 end
 
-if nargin<8
+if nargin<10
     plot_on = true;
 end
 
@@ -122,7 +131,7 @@ spindles = zeros(1,N);
 lambda_peak = modulation_factor*cos(SO_phase-phase_pref);
 
 %Generate Poisson events
-spindle_inds = poissrnd((lambda_peak + spindle_baseline)/Fs/60,1,N)>0;
+spindle_inds = poissrnd((lambda_peak + spindle_baseline_rate)/Fs/60,1,N)>0;
 spindle_inds = find(spindle_inds);
 
 %Loop through all events and generate spindles
@@ -133,7 +142,7 @@ for ii = 1:length(spindle_inds)
         %Simulate spindle waveform
         spindle_duration = rand*1.5 + .5;
         spindle_amp = rand*5 + 5;
-        spindle_freq = 15 + randn*.3;
+        spindle_freq = spindle_freq + randn*spindle_std;
 
         sp_t = linspace(0,spindle_duration,spindle_duration*Fs);
         spindle = sin(2*pi*sp_t*spindle_freq) .* hanning(length(sp_t))'*spindle_amp;

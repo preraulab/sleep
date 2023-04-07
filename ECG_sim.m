@@ -116,93 +116,92 @@ ECG=pwav+qrswav+twav+swav+qwav+uwav;
 end
 
 function [pwav]=p_wav(x,a_pwav,d_pwav,t_pwav,li)
-l=li;
 a=a_pwav;
 x=x+t_pwav;
-b=(2*l)/d_pwav;
-n=100;
-p1=1/l;
-p2=0;
-for i = 1:n
-    harm1=(((sin((pi/(2*b))*(b-(2*i))))/(b-(2*i))+(sin((pi/(2*b))*(b+(2*i))))/(b+(2*i)))*(2/pi))*cos((i*pi*x)/l);
-    p2=p2+harm1;
-end
+b=(2*li)/d_pwav;
+n=50;
+p1=1/li;
+
+harms = transpose(1:n);
+
+harm1=(((sin((pi./(2*b)).*(b-(2.*harms))))./(b-(2.*harms))+(sin((pi./(2.*b)).*(b+(2.*harms))))./(b+(2.*harms))).*(2/pi)).*cos((harms.*pi.*x)./li);
+p2 = sum(harm1);
+
 pwav1=p1+p2;
 pwav=a*pwav1;
 end
 
 function [qwav]=q_wav(x,a_qwav,d_qwav,t_qwav,li)
-l=li;
 x=x+t_qwav;
 a=a_qwav;
-b=(2*l)/d_qwav;
-n=100;
+b=(2*li)/d_qwav;
+n=50;
 q1=(a/(2*b))*(2-b);
-q2=0;
-for i = 1:n
-    harm5=(((2*b*a)/(i*i*pi*pi))*(1-cos((i*pi)/b)))*cos((i*pi*x)/l);
-    q2=q2+harm5;
-end
+
+harms = transpose(1:n);
+
+harm5=(((2*b*a)./(harms.*harms.*pi*pi)).*(1-cos((harms*pi)/b))).*cos((harms*pi*x)/li);
+q2=sum(harm5);
+
 qwav=-1*(q1+q2);
 end
 
 function [qrswav]=qrs_wav(x,a_qrswav,d_qrswav,li)
-l=li;
 a=a_qrswav;
-b=(2*l)/d_qrswav;
-n=100;
+b=(2*li)/d_qrswav;
+n=50;
 qrs1=(a/(2*b))*(2-b);
-qrs2=0;
-for i = 1:n
-    harm=(((2*b*a)/(i*i*pi*pi))*(1-cos((i*pi)/b)))*cos((i*pi*x)/l);
-    qrs2=qrs2+harm;
-end
+
+harms = transpose(1:n);
+harm=(((2*b*a)./(harms.*harms*pi*pi)).*(1-cos((harms*pi)/b))).*cos((harms.*pi.*x)/li);
+qrs2=sum(harm);
+
 qrswav=qrs1+qrs2;
 end
 
 function [swav]=s_wav(x,a_swav,d_swav,t_swav,li)
-l=li;
 x=x-t_swav;
 a=a_swav;
-b=(2*l)/d_swav;
-n=100;
+b=(2*li)/d_swav;
+n=50;
 s1=(a/(2*b))*(2-b);
-s2=0;
-for i = 1:n
-    harm3=(((2*b*a)/(i*i*pi*pi))*(1-cos((i*pi)/b)))*cos((i*pi*x)/l);
-    s2=s2+harm3;
-end
+
+harms = transpose(1:n);
+
+harm3=(((2*b*a)./(harms.*harms*pi*pi)).*(1-cos((harms.*pi)/b))).*cos((harms.*pi.*x)/li);
+s2=sum(harm3);
+
 swav=-1*(s1+s2);
 end
 
 function [twav]=t_wav(x,a_twav,d_twav,t_twav,li)
-l=li;
+
 a=a_twav;
 x=x-t_twav-0.045;
-b=(2*l)/d_twav;
-n=100;
-t1=1/l;
-t2=0;
-for i = 1:n
-    harm2=(((sin((pi/(2*b))*(b-(2*i))))/(b-(2*i))+(sin((pi/(2*b))*(b+(2*i))))/(b+(2*i)))*(2/pi))*cos((i*pi*x)/l);
-    t2=t2+harm2;
-end
+b=(2*li)/d_twav;
+n=50;
+t1=1/li;
+
+harms = transpose(1:n);
+harm2=(((sin((pi/(2*b)).*(b-(2*harms))))./(b-(2*harms))+(sin((pi/(2*b)).*(b+(2*harms))))./(b+(2.*harms))).*(2/pi)).*cos((harms.*pi.*x)/li);
+t2=sum(harm2);
+
 twav1=t1+t2;
 twav=a*twav1;
 end
 
 function [uwav]=u_wav(x,a_uwav,d_uwav,t_uwav,li)
-l=li;
+
 a=a_uwav;
 x=x-t_uwav;
-b=(2*l)/d_uwav;
-n=100;
-u1=1/l;
-u2=0;
-for i = 1:n
-    harm4=(((sin((pi/(2*b))*(b-(2*i))))/(b-(2*i))+(sin((pi/(2*b))*(b+(2*i))))/(b+(2*i)))*(2/pi))*cos((i*pi*x)/l);
-    u2=u2+harm4;
-end
+b=(2*li)/d_uwav;
+n=50;
+u1=1/li;
+
+harms = transpose(1:n);
+harm4=(((sin((pi/(2*b)).*(b-(2*harms))))./(b-(2*harms))+(sin((pi/(2*b)).*(b+(2*harms))))./(b+(2*harms))).*(2/pi)).*cos((harms.*pi.*x)/li);
+u2=sum(harm4);
+
 uwav1=u1+u2;
 uwav=a*uwav1;
 end
