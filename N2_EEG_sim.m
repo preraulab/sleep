@@ -1,11 +1,50 @@
 function [signal, spindle_times, spindle_phase] = N2_EEG_sim(Fs, total_time, phase_pref, ...
     spindle_freq_mean, spindle_freq_std, spindle_amp_mean, spindle_amp_std, spindle_dur_mean, spindle_dur_std,...
     spindle_baseline_rate, modulation_factor, spindle_min_separation, alpha_exp, plot_on)
+%N2_EEG_SIM Simulates N2 sleep stage EEG signals with spindle and K-complex events
+%
+% [signal, spindle_times, spindle_phase] = N2_EEG_sim(Fs, total_time, phase_pref, spindle_freq_mean, spindle_freq_std, spindle_amp_mean, spindle_amp_std, spindle_dur_mean, spindle_dur_std, spindle_baseline_rate, modulation_factor, spindle_min_separation, alpha_exp, plot_on)
+%
+% Inputs:
+% - Fs: Sampling frequency in Hz
+% - total_time: Total time of the signal to be simulated in seconds
+% - phase_pref: Preferred phase angle of spindle events in radians (default: pi)
+% - spindle_freq_mean: Mean frequency of spindle events in Hz (default: 15)
+% - spindle_freq_std: Standard deviation of frequency of spindle events in Hz (default: 1)
+% - spindle_amp_mean: Mean amplitude of spindle events in uV (default: 5)
+% - spindle_amp_std: Standard deviation of amplitude of spindle events in uV (default: 0.5)
+% - spindle_dur_mean: Mean duration of spindle events in seconds (default: 1.5)
+% - spindle_dur_std: Standard deviation of duration of spindle events in seconds (default: 0.25)
+% - spindle_baseline_rate: Baseline spindle rate in events/min (default: 10)
+% - modulation_factor: Modulation factor for cosine tuning of spindle events (default: 40)
+% - spindle_min_separation: Minimum separation between spindle events in seconds (default: 0.5)
+% - alpha_exp: Exponent of the 1/f^alpha colored noise (default: 1.5)
+% - plot_on: Boolean flag to plot the generated signal or not (default: true)
+%
+% Outputs:
+% - signal: Simulated N2 sleep stage EEG signal with spindle and K-complex events
+% - spindle_times: Times of spindle events in seconds
+% - spindle_phase: Phase angles of spindle events in radians
+%
+% Example usage:
+% %Create 1 hour of data
+% Fs = 200;
+% total_time = 3600;
+% phase_pref = -3*pi/4;
+% signal = N2_EEG_sim(Fs, total_time, phase_pref);
+%
+%    Copyright 2023 Michael J. Prerau Laboratory. - http://www.sleepEEG.org
+%    Authors: Michael J. Prerau, Ph.D.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 %Create a sample to run as default
 if nargin == 0
+    %Create 1 hour of data
     Fs = 200;
+    
     total_time = 3600;
-    phase_pref = pi/2;
+    phase_pref = -3*pi/4;
+
     signal = N2_EEG_sim(Fs, total_time, phase_pref);
     return;
 end
