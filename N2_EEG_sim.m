@@ -3,7 +3,7 @@ function [signal, spindle_times, spindle_freqs, spindle_amps, spindle_durations,
     spindle_baseline_rate, modulation_factor, spindle_min_separation, alpha_exp, noise_factor, plot_on)
 %N2_EEG_SIM Simulates N2 sleep stage EEG signals with spindle and K-complex events
 %
-% [signal, spindle_times, spindle_phase] = N2_EEG_sim(Fs, total_time, phase_pref, spindle_freq_mean, spindle_freq_std, spindle_amp_mean, spindle_amp_std, spindle_dur_mean, spindle_dur_std, spindle_baseline_rate, modulation_factor, spindle_min_separation, alpha_exp, plot_on)
+% [signal, spindle_times, spindle_phase] = N2_EEG_sim(Fs, total_time, phase_pref, spindle_freq_mean, spindle_freq_std, spindle_amp_mean, spindle_amp_std, spindle_dur_mean, spindle_dur_std, spindle_baseline_rate, modulation_factor, spindle_min_separation, alpha_exp, noise_factor, plot_on)
 %
 % Inputs:
 % - Fs: Sampling frequency in Hz
@@ -65,50 +65,50 @@ if nargin<5 || isempty(spindle_freq_std)
     spindle_freq_std = 1;
 end
 
-if nargin<4 || isempty(spindle_amp_mean)
-    spindle_amp_mean = 5;
+if nargin<6 || isempty(spindle_amp_mean)
+    spindle_amp_mean = 8;
 end
 
 %Modulation factor for cosine tuning
-if nargin<6 || isempty(spindle_amp_std)
+if nargin<7 || isempty(spindle_amp_std)
     spindle_amp_std = .5;
 end
 
-if nargin<7 || isempty(spindle_dur_mean)
+if nargin<8 || isempty(spindle_dur_mean)
     spindle_dur_mean = 1.5;
 end
 
 %Modulation factor for cosine tuning
-if nargin<8 || isempty(spindle_dur_std)
+if nargin<9 || isempty(spindle_dur_std)
     spindle_dur_std = .25;
 end
 
-if nargin<9 || isempty(spindle_baseline_rate)
+if nargin<10 || isempty(spindle_baseline_rate)
     spindle_baseline_rate = 10;
 end
 
 %Modulation factor for cosine tuning
-if nargin<10 || isempty(modulation_factor)
+if nargin<11 || isempty(modulation_factor)
     modulation_factor = 40;
 end
 
 %Set min spacing between events
-if nargin<11 || isempty(spindle_min_separation)
+if nargin<12 || isempty(spindle_min_separation)
     spindle_min_separation = 0.5;
 end
 
 %Set 1/f^alpha
-if nargin<12 || isempty(alpha_exp)
+if nargin<13 || isempty(alpha_exp)
     alpha_exp = 1.5;
 end
 
 %Set 1/f^alpha
-if nargin<13 || isempty(noise_factor)
+if nargin<14 || isempty(noise_factor)
     noise_factor = 3;
 end
 
 %Turn plot on/off
-if nargin<14
+if nargin<15
     plot_on = true;
 end
 
