@@ -1,7 +1,7 @@
 function [signal, spindle_stats] = N2_EEG_sim(Fs, total_time, spindle_opts, noise_opts, plot_on)
 %N2_EEG_SIM Simulates N2 sleep stage EEG signals with spindle and K-complex events
 %
-% [signal, spindle_times, spindle_phase] = N2_EEG_sim(Fs, total_time, spindle_opts, noise_opts,  plot_on)
+% [signal, spindle_stats] = N2_EEG_sim(Fs, total_time, spindle_opts, noise_opts,  plot_on)
 %
 % Inputs:
 % - Fs: Sampling frequency in Hz
@@ -195,11 +195,11 @@ for ss = 1:length(spindle_opts)
         end
     end
 
-    spindle_stats(ss).spindle_times = spindle_inds/Fs;
+    spindle_stats(ss).spindle_times = spindle_inds(valid_inds)/Fs;
     spindle_stats(ss).spindle_freqs = spindle_freqs(valid_inds);
     spindle_stats(ss).spindle_amps = spindle_amps(valid_inds);
     spindle_stats(ss).spindle_durations = spindle_durations(valid_inds);
-    spindle_stats(ss).spindle_phase = SO_phase(spindle_inds);
+    spindle_stats(ss).spindle_phase = SO_phase(spindle_inds(valid_inds));
 
 
     %Add spindles to the signal
