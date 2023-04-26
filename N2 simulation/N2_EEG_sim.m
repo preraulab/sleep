@@ -93,19 +93,52 @@ end
 
 %% Generate "slow" and "delta" waveforms by spline interpolation
 
-%Create low-res random ~1Hz noise
-slow_rnd = randn(1,round(N/60/Fs*120))*2;
-slow_rnd([1 end]) = 0; %Keep spline well-behaved
+% %Create low-res random ~1Hz noise
+% slow_rnd = randn(1,round(N/60/Fs*120))*2;
+% slow_rnd([1 end]) = 0; %Keep spline well-behaved
+% 
+% %Interpolate the noise to make a slow component
+% slow = interp1(linspace(1,N,length(slow_rnd)),slow_rnd,1:N,'spline');
+% 
+% %Create low-res random ~5Hz noise
+% delta_rnd = randn(1,round(N/60/Fs*120*5))*1;
+% delta_rnd([1 end]) = 0; %Keep spline well-behaved
+% 
+% %Interpolate the noise to make a slow component
+% delta = interp1(linspace(1,N,length(delta_rnd)),delta_rnd,1:N,'spline');
 
-%Interpolate the noise to make a slow component
-slow = interp1(linspace(1,N,length(slow_rnd)),slow_rnd,1:N,'spline');
+%Compute SO-power
+SO_freqrange = [0.11 2];
+d = designfilt('bandpassiir', ...       % Response type
+    'StopbandFrequency1',SO_freqrange(1)-0.1, ...    % Frequency constraints
+    'PassbandFrequency1',SO_freqrange(1), ...
+    'PassbandFrequency2',SO_freqrange(2), ...
+    'StopbandFrequency2',SO_freqrange(2)+0.1, ...
+    'StopbandAttenuation1',60, ...   % Magnitude constraints
+    'PassbandRipple',1, ...
+    'StopbandAttenuation2',60, ...
+    'DesignMethod','ellip', ...      % Design method
+    'MatchExactly','passband', ...   % Design method options
+    'SampleRate',Fs);
 
-%Create low-res random ~5Hz noise
-delta_rnd = randn(1,round(N/60/Fs*120*5))*1;
-delta_rnd([1 end]) = 0; %Keep spline well-behaved
+slow = filtfilt(d,randn(1,N));
 
-%Interpolate the noise to make a slow component
-delta = interp1(linspace(1,N,length(delta_rnd)),delta_rnd,1:N,'spline');
+%Compute SO-power
+SO_freqrange = [1.5 5];
+d = designfilt('bandpassiir', ...       % Response type
+    'StopbandFrequency1',SO_freqrange(1)-1, ...    % Frequency constraints
+    'PassbandFrequency1',SO_freqrange(1), ...
+    'PassbandFrequency2',SO_freqrange(2), ...
+    'StopbandFrequency2',SO_freqrange(2)+8, ...
+    'StopbandAttenuation1',60, ...   % Magnitude constraints
+    'PassbandRipple',1, ...
+    'StopbandAttenuation2',60, ...
+    'DesignMethod','ellip', ...      % Design method
+    'MatchExactly','passband', ...   % Design method options
+    'SampleRate',Fs);
+
+delta = filtfilt(d,randn(1,N));
+
 
 %% Generate colored noise
 %1/f^alpha
@@ -115,7 +148,7 @@ noise = cn()*noise_opts.noise_factor;
 
 %% Create baseline signal and compute slow oscillation
 %Create signal and zero mean
-signal = K_complexes + slow + delta + noise';
+signal = K_complexes + slow + 10*delta + noise';
 
 %Compute SO-power
 SO_freqrange = [.3 1.5];
@@ -238,7 +271,7 @@ if plot_on
     ax = figdesign(1,1,'orient','landscape','margin',[.1 .1 .05, .3  .03]);
     ax_split = split_axis(ax,[.2 .2 .6], 1);
     axes(ax_split(3))
-    multitaper_spectrogram_mex(signal, Fs, [.5 25], [2 3], [1 .05], 2^10,'constant');
+    [spect, stimes, sfreqs] = multitaper_spectrogram_mex(signal, Fs, [.5 25], [2 3], [1 .05], 2^10,'constant');
     climscale; 
     colormap(rainbow4);
     axes(ax_split(2))
