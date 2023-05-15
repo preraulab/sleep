@@ -1,4 +1,4 @@
-function [signal, spindle_stats] = N2_EEG_sim(Fs, total_time, spindle_opts, noise_opts, plot_on)
+function [signal, spindle_stats] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts, plot_on)
 %N2_EEG_SIM Simulates N2 sleep stage EEG signals with spindle and K-complex events
 %
 % [signal, spindle_stats] = N2_EEG_sim(Fs, total_time, spindle_opts, noise_opts,  plot_on)
@@ -6,6 +6,7 @@ function [signal, spindle_stats] = N2_EEG_sim(Fs, total_time, spindle_opts, nois
 % Inputs:
 % - Fs: Sampling frequency in Hz
 % - total_time: Total time of the signal to be simulated in seconds
+% - baseline_time: Amount of the signal without peaks to act as a detection baseline
 % - spindle_opts: A array of spindle options structures (one for each spindle set) from N2_EEG_sim_spindle_opts()
 % - noise_opts: A spindle options structure from N2_EEG_sim_noise_opts()
 % - plot_on: Boolean flag to plot the generated signal or not (default: true)
@@ -30,13 +31,14 @@ if nargin == 0
     %Create 1 hour of data
     Fs = 200;
     total_time = 3600;
+    baseline_time = 60*5; %Set first 5 minutes to be baseline
 
     spindle_opts(1) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',15,'spindle_freq_std',.25,'phase_pref',0);
     spindle_opts(2) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',12,'spindle_freq_std',.25,'phase_pref',pi/2);
 
     noise_opts = N2_EEG_sim_noise_opts;
 
-    signal = N2_EEG_sim(Fs, total_time, spindle_opts, noise_opts);
+    signal = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts);
 
     return;
 end
@@ -44,17 +46,21 @@ end
 assert(Fs>0, 'Must have positive sampling frequency');
 assert(total_time>0, 'Must have positive total time');
 
+if nargin<3
+    baseline_time = 0;
+end
+
 %Set phase pref and max prob
-if nargin<3 || isempty(spindle_opts)
+if nargin<4 || isempty(spindle_opts)
     spindle_opts = N2_EEG_sim_spindle_opts;
 end
 
-if nargin<4 || isempty(noise_opts)
+if nargin<5 || isempty(noise_opts)
     noise_opts = N2_EEG_sim_noise_opts;
 end
 
 %Turn plot on/off
-if nargin<5
+if nargin<6
     plot_on = true;
 end
 
@@ -192,6 +198,7 @@ for ss = 1:length(spindle_opts)
 
     %Generate Poisson events
     spindle_inds = poissrnd(lambda/Fs/60,1,N)>0;
+    spindle_inds(1:baseline_time*Fs) = 0; %Remove all peaks during baseline time
     spindle_inds = find(spindle_inds);
 
     spindle_durations = nan(1,length(spindle_inds));
