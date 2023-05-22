@@ -30,11 +30,9 @@ function sh = hypnoplot(time,stage,varargin)
 %         subplot(212)
 %         hypnoplot(time, stage,'HypnogramLabels', {'U','3','2','1','R','W','A'},'LabelPos','top');
 %
-%   Copyright 2022 Prerau Lab - http://www.sleepEEG.org
+%   Copyright 2023 Prerau Lab - http://www.sleepEEG.org
 %   This work is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
 %   (http://creativecommons.org/licenses/by-nc-sa/4.0/)
-%
-%   Last modified 06/02/2022
 %% ********************************************************************
 
 %Check for old input
@@ -123,6 +121,22 @@ max_y = val_max + PlotBuffer;
 
 hold on;
 
+if strcmpi(LabelPos,'left')
+    set(gca,'ytick',val_min:val_max,'yticklabel',HypnogramLabels(val_min+1:val_max+1),'xticklabel','');
+else
+    %Get just the stages that exist
+    stage_list = unique(stage);
+
+    %Plot all the first letter at the top of the first instance
+    for ss = 1:length(stage_list)
+        stg = stage_list(ss);
+        first_stage = find(stage==stg,1,"first");
+
+        text(time(first_stage),max_y,HypnogramLabels{stg+1},'VerticalAlignment','baseline','HorizontalAlignment','center');
+    end
+    set(gca,'yticklabel','')
+end
+
 if GroupNREMColors %Merge all NREM
     stage(stage==1 | stage == 3) = 2;
 end
@@ -143,21 +157,6 @@ end
 %Keep hypnogram trace on top
 uistack(sh,'top');
 
-if strcmpi(LabelPos,'left')
-    set(gca,'ytick',val_min:val_max,'yticklabel',HypnogramLabels(val_min+1:val_max+1),'xticklabel','');
-else
-    %Get just the stages that exist
-    stage_list = unique(stage);
-
-    %Plot all the first letter at the top of the first instance
-    for ss = 1:length(stage_list)
-        stg = stage_list(ss);
-        first_stage = find(stage==stg,1,"first");
-
-        text(time(first_stage),max_y,HypnogramLabels{stg+1},'VerticalAlignment','baseline','HorizontalAlignment','center');
-    end
-    set(gca,'yticklabel','')
-end
 
 %Set the proper limits
 if length(time) == 2
