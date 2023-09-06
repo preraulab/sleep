@@ -158,11 +158,13 @@ end
 uistack(sh,'top');
 
 
-%Set the proper limits
-if length(time) == 2
-    xlim(time([1 end]));
-else
-    xlim(time([1 end-1]));
-end
+% %Set the proper limits
+% if length(time) == 2
+%     xlim(time([1 end]));
+% else
+% xlim(time([1 end-1]));
+% end
 
+%Set limits
+axis tight;
 ylim([min_y max_y]);
