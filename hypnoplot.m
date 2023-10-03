@@ -5,13 +5,18 @@ function sh = hypnoplot(stage_times,stage_vals,varargin)
 %       hyp_handle = hypnoplot(stage_times, stage_vals, <optional arguments>)
 %
 %   Input:
-%       stage_times: 1xN vector of stage times
+%       stage_times: 1xN vector of stage times 
+%             NOTE: Assumes each stage time indicates stage ONSET time, with an epoch ranging from
+%             stage_times(t) to stage_times(t+1)
 %       stage_vals: 1xN vector of stage values (6: Artifact 5: Wake, 4:REM, 3:N1, 2:N2, 1:N3, 0:Undefined)
+%             NOTE: Stage are labeled in the plot order of the y-axis, so N1 = 3 and N3 = 1
 %       
 %   Optional Name-Value Pairs:
 %       'Artifacts': 1xT logical vector of artifacts, must include EITHER Fs or ArtifactTimes
-%       'Fs': Sampling frequency for artifacts
-%       'ArtifactTimes': 1xT vector of time values for artifacts
+%       'Fs': Sampling frequency for artifacts. 
+%             NOTE: Assumes time starts at 0, which is the time of the first stage
+%       'ArtifactTimes': 1xT vector of time values for artifacts 
+%             NOTE: Must be in alignment with stage_times
 %       'HypnogramLabels': 1x7 cell, stage name labels, default: {'Undef','N3','N2','N1','REM','Wake','Art'}
 %       'LabelPos': 'top' or 'left', label position, default: 'left'
 %       'StageColors': 7x3 double
@@ -22,15 +27,19 @@ function sh = hypnoplot(stage_times,stage_vals,varargin)
 %       hyp_handle: handle to stairs object for hypnogram
 %
 %   Example:
-%         stage = [0 0 0 5 4 3 2 2 6 6 6 2 1 2 3 5 6 5 6 5 6 6 5 5 3 2 1 4 4 6 5 4 0 3 2 1 1 0 0 6 nan];
-%         time = (1:length(stage))*30;
-%         
-%         figure
-%         subplot(211)
-%         hypnoplot(time, stage);
-%         
-%         subplot(212)
-%         hypnoplot(time, stage,'HypnogramLabels', {'U','3','2','1','R','W','A'},'LabelPos','top');
+%       stage_vals = [0 0 0 5 4 3 2 2 6 6 6 2 1 2 3 5 6 5 6 5 6 6 5 5 3 2 1 4 4 6 5 4 0 3 2 1 1 0 0 6];
+%       stage_times = (1:length(stage_vals))*30;
+%       Fs = 200;
+%       ArtifactTimes = (0:max(stage_times))/Fs;
+%       Artifacts = zeros(size(ArtifactTimes));
+%       Artiifacts([350*Fs:375*Fs  1050*Fs:10105*Fs 3000*Fs:4000*Fs]) = 1;
+%       
+%       figure
+%       subplot(211)
+%       hypnoplot(stage_times, stage_vals, 'Artifacts', Artifacts, 'Fs', Fs);
+%       
+%       subplot(212)
+%       hypnoplot(stage_times, stage_vals,'HypnogramLabels', {'U','3','2','1','R','W','A'},'LabelPos','top', 'Artifacts', Artifacts, 'ArtifactTimes', ArtifactTimes);
 %
 %   Copyright 2023 Prerau Lab - http://www.sleepEEG.org
 %   This work is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
