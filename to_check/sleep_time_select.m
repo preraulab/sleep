@@ -42,7 +42,7 @@ function time_segments = sleep_time_select(time_bounds, hyp_times, hyp_stages, s
 %         vline(time_segments(:,2)',3,'g'); %End times
 %         vline(excluded_times(:)',1,'y','--'); %Excluded times
 %
-%   Copyright 2018 Michael J. Prerau, Ph.D.
+%   Copyright 2024 Michael J. Prerau, Ph.D.
 %
 %   Last modified 11/13/2018
 %% ********************************************************************

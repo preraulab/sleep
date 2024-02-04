@@ -16,7 +16,7 @@ function [SO_ptiles_processed, SO_power_rmartifacts, stimes] = ...
 %   Output:
 %   processed_ptiles: 1x2 double vector of processed percentiles
 %
-%   Copyright 2018 Michael J. Prerau, Ph.D.
+%   Copyright 2024 Michael J. Prerau, Ph.D.
 %
 %   Last modified 09/13/2018
 %********************************************************************

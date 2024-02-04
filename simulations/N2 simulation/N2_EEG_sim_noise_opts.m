@@ -10,7 +10,7 @@ function noise_opts = N2_EEG_sim_noise_opts(varargin)
 %   Outputs:
 %       - noise_opts: structure with fields for each input
 %
-%    Copyright 2023 Michael J. Prerau Laboratory. - http://www.sleepEEG.org
+%    Copyright 2024 Michael J. Prerau Laboratory. - http://www.sleepEEG.org
 
 parser = inputParser;
 parser.addParameter('alpha_exp', 1.5, @(x) validateattributes(x, {'numeric'}, {'nonnegative', 'real', 'scalar'}));

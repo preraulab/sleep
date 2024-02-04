@@ -24,7 +24,7 @@ function spindle_opts = N2_EEG_sim_spindle_opts(varargin)
 %    spindle_opts = N2_EEG_sim_spindle_opts('spindle_freq_mean', 12, 'spindle_amp_mean', 5)
 %    This returns a structure containing options for simulating N2 EEG spindles with mean frequency 12 Hz and mean amplitude 5 microvolts.
 %
-%    Copyright 2023 Michael J. Prerau Laboratory. - http://www.sleepEEG.org
+%    Copyright 2024 Michael J. Prerau Laboratory. - http://www.sleepEEG.org
 
 
 % Set default values

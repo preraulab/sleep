@@ -22,7 +22,7 @@ function [signal, spindle_stats] = N2_EEG_sim(Fs, total_time, baseline_time, spi
 %       phase_pref = -3*pi/4;
 %       signal = N2_EEG_sim(Fs, total_time);
 %
-%    Copyright 2021 Michael J. Prerau Laboratory. - http://www.sleepEEG.org
+%    Copyright 2024 Michael J. Prerau Laboratory. - http://www.sleepEEG.org
 %    Authors: Michael J. Prerau, Ph.D.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
