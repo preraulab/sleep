@@ -16,7 +16,6 @@ function sh = hypnoplot(stage_times,stage_vals,varargin)
 %       'Fs': Sampling frequency for artifacts. 
 %             NOTE: Assumes time starts at 0, which is the time of the first stage
 %       'ArtifactTimes': 1xT vector of time values for artifacts 
-%             NOTE: Must be in alignment with stage_times
 %       'HypnogramLabels': 1x7 cell, stage name labels, default: {'Undef','N3','N2','N1','REM','Wake','Art'}
 %       'LabelPos': 'top' or 'left', label position, default: 'left'
 %       'StageColors': 7x3 double
@@ -32,7 +31,7 @@ function sh = hypnoplot(stage_times,stage_vals,varargin)
 %       Fs = 200;
 %       ArtifactTimes = (0:max(stage_times))/Fs;
 %       Artifacts = zeros(size(ArtifactTimes));
-%       Artiifacts([350*Fs:375*Fs  1050*Fs:10105*Fs 3000*Fs:4000*Fs]) = 1;
+%       Artifacts([350*Fs:375*Fs  1050*Fs:10105*Fs 3000*Fs:4000*Fs]) = 1;
 %       
 %       figure
 %       subplot(211)
@@ -66,7 +65,7 @@ p = inputParser;
 
 addRequired(p,'stage_times',@(x)validateattributes(x,{'numeric'},{'nonempty'}));
 addRequired(p,'stage_vals',@(x)validateattributes(x,{'numeric'},{'nonempty'}));
-addOptional(p,'Artifacts',[],@(x)validateattributes(x,{'numeric'},{'nonempty'}));
+addOptional(p,'Artifacts',[],@(x)validateattributes(x,{'logical','numeric'},{'nonempty'}));
 addOptional(p,'Fs',[],@(x)validateattributes(x,{'numeric'},{'nonempty','positive'}));
 addOptional(p,'ArtifactTimes',[],@(x)validateattributes(x,{'numeric'},{'nonempty'}));
 addOptional(p,'HypnogramLabels',{'Undef','N3','N2','N1','REM','Wake','Art'},@iscell);
@@ -96,12 +95,16 @@ if iscolumn(stage_times)
     stage_times = stage_times';
 end
 
+%Make stage vals double
+if ~isa(stage_vals,'double')
+    stage_vals = double(stage_vals);
+end
+
 assert(isequal(size(stage_times),size(stage_vals)),'time and stage must be the same dimensions')
 assert(size(StageColors,2)==3,'Colors must be an N x 3 matrix')
 assert(length(HypnogramLabels)==7,'Hypnogram labels must be a 1 x 7 cell of strings - Undefined, N3, N2, N1, R, W, Artifiact')
 assert(ismember(lower(LabelPos),{'left','top'}),'LabelPos must be "left" or "top"')
 
- 
 if ~isempty(artifacts)
     assert(xor(~isempty(Fs), ~isempty(artifact_times)), 'Must provide either sampling frequency or time vector for artifacts')
 
@@ -115,32 +118,24 @@ end
 stage_times(end+1) = stage_times(end)+30;
 stage_vals(end+1) = stage_vals(end);
 
-if ~isempty(artifacts)
-    if ~isempty(Fs)
-        artifact_times = (0:length(artifacts)-1)/Fs;
+%Check for artifact inputs
+if ~isempty(artifacts) || ~isempty(artifact_times)
+    %Create a t
+    if ~isempty(Fs) && isempty(artifact_times)
+        t = (0:length(artifacts)-1)/Fs;
     end
 
-    %Get consecutive artifacts longer than one time point
-   [~, run_inds] = consecutive_runs(artifacts,2);
-   start_inds = cellfun(@(x)x(1),run_inds);
-   end_inds = cellfun(@(x)x(end),run_inds);
+    %Generate a t based on given artifact times
+    if ~isempty(artifact_times)
+        dt = min(diff(artifact_times));
+        t = min(stage_times):dt:max(stage_times);
+        artifacts = logical(histcounts(artifact_times,t));
+    end
 
-   %Find the proper end stage
-   stage_ends = interp1(stage_times,stage_vals,artifact_times(end_inds),'previous');
-
-   %Delete the stages in the middle
-   for ii = 1:length(start_inds)
-       delete_inds = stage_times>=artifact_times(start_inds(ii)) & stage_times<artifact_times(end_inds(ii));
-       stage_times = stage_times(~delete_inds);
-       stage_vals = stage_vals(~delete_inds);
-   end
-
-   %Add to the hypnogram
-   stage_times = [stage_times artifact_times(start_inds) artifact_times(end_inds)];
-   stage_vals = [stage_vals 6*ones(1,sum(start_inds)) stage_ends];
-
-   [stage_times, sort_inds] = sort(stage_times);
-   stage_vals = stage_vals(sort_inds);
+    %Interpolate the hypogram to t and insert the artifacts
+    stage_vals = interp1(stage_times, stage_vals, t,'previous');
+    stage_vals(artifacts) = 6;
+    stage_times = t;
 end
 
 %Simplify vector
@@ -157,17 +152,8 @@ stage_vals(stage_vals>6) = 6;
 sh = stairs(stage_times,stage_vals,'k','linewidth',2);
 
 %Adjust plot to include no stage and artifacts
-if any(~stage_vals)
-    val_min = 0;
-else
-    val_min = 1;
-end
-
-if any(stage_vals==6)
-    val_max = 6;
-else
-    val_max = 5;
-end
+val_min = min(stage_vals);
+val_max = max(stage_vals);
 
 %Set ylim range
 min_y = val_min - PlotBuffer;
@@ -210,14 +196,6 @@ end
 
 %Keep hypnogram trace on top
 uistack(sh,'top');
-
-
-% %Set the proper limits
-% if length(time) == 2
-%     xlim(time([1 end]));
-% else
-% xlim(time([1 end-1]));
-% end
 
 %Set limits
 axis tight;
