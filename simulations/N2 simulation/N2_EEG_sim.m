@@ -1,7 +1,7 @@
-function [signal, spindle_stats] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts, plot_on)
+function [signal, spindle_stats, K_complexes, spindles] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts, plot_on)
 %N2_EEG_SIM Simulates N2 sleep stage EEG signals with spindle and K-complex events
 %
-% [signal, spindle_stats] = N2_EEG_sim(Fs, total_time, spindle_opts, noise_opts,  plot_on)
+% [signal, spindle_stats] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts,  plot_on)
 %
 % Inputs:
 % - Fs: Sampling frequency in Hz
@@ -72,12 +72,12 @@ t = (1:N)/Fs;
 K_complexes = zeros(1,N);
 
 %Set KC rate (events/minute) to be lambda of a Poisson process
-kc_rate = 30;
+kc_rate = 40;
 
 %Generate Poisson events
 kc_times = find(poissrnd(kc_rate/60/Fs, 1, N));
 %Set min spacing between events
-kc_min_separation = 2;
+kc_min_separation = 0;
 
 %Loop through all events and generate KCs
 for ii = 1:length(kc_times)
