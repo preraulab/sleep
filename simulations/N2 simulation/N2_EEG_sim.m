@@ -1,4 +1,4 @@
-function [signal, spindle_stats, K_complexes, spindles] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts, plot_on)
+function [signal, spindle_stats, K_complexes, spindles, slow, delta, noise] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts, plot_on)
 %N2_EEG_SIM Simulates N2 sleep stage EEG signals with spindle and K-complex events
 %
 % [signal, spindle_stats] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts,  plot_on)
@@ -143,7 +143,7 @@ d = designfilt('bandpassiir', ...       % Response type
     'MatchExactly','passband', ...   % Design method options
     'SampleRate',Fs);
 
-delta = filtfilt(d,randn(1,N));
+delta = filtfilt(d,randn(1,N))*10;
 
 
 %% Generate colored noise
@@ -151,10 +151,10 @@ delta = filtfilt(d,randn(1,N));
 
 cn = dsp.ColoredNoise('SamplesPerFrame', N, 'InverseFrequencyPower', noise_opts.alpha_exp);
 noise = cn()*noise_opts.noise_factor;
+noise = noise';
 
 %% Create baseline signal and compute slow oscillation
-%Create signal and zero mean
-signal = K_complexes + slow + 10*delta + noise';
+
 
 %Compute SO-power
 SO_freqrange = [.3 1.5];
@@ -170,7 +170,7 @@ d = designfilt('bandpassiir', ...       % Response type
     'MatchExactly','passband', ...   % Design method options
     'SampleRate',Fs);
 
-SO_power = filtfilt(d,double(signal));
+SO_power = filtfilt(d,double(K_complexes + slow + delta + noise ));
 
 %Extract SO-phase
 SO_phase = angle(hilbert(SO_power));
@@ -243,7 +243,7 @@ for ss = 1:length(spindle_opts)
 
 
     %Add spindles to the signal
-    signal = signal + spindles;
+    signal = K_complexes + slow + delta + noise + spindles;
 end
 
 %Convert spindle inds into times
