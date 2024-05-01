@@ -198,5 +198,5 @@ end
 uistack(sh,'top');
 
 %Set limits
-axis tight;
 ylim([min_y max_y]);
+xlim([min(stage_times) max(stage_times)])
