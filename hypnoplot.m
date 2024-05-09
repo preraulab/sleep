@@ -30,13 +30,13 @@ function sh = hypnoplot(stage_times,stage_vals,varargin)
 %       stage_vals = [0 0 0 5 5 5 4 3 2 2 2 1 2 1 2 3 5 5 5 1 5 1 2 5 3 2 1 4 4 4 5 4 0 3 2 1 1 5 5 5 0 0 0];
 %       stage_vals(stage_vals <2) = 5;
 %       stage_times = (0:length(stage_vals)-1)*30;
-%       
+%
 %       %Simulate some artifacts
 %       Fs = 200;
 %       dt = 1/Fs;
 %       artifact_times = 0:dt:max(stage_times);
 %       artifacts = rand(size(artifact_times))<.002;
-%       
+%
 %       figure
 %       subplot(211)
 %       hypnoplot(stage_times, stage_vals, 'Artifacts', artifacts, 'Fs', Fs);
@@ -149,7 +149,7 @@ if strcmpi(LabelPos,'left')
         labels = [{'Art'} labels(:)'];
         set(gca,'ytick',[val_min-1 val_min:val_max],'yticklabel',labels,'xticklabel','');
     else
-    set(gca,'ytick',val_min:val_max,'yticklabel',HypnogramLabels(val_min+1:val_max+1),'xticklabel','');
+        set(gca,'ytick',val_min:val_max,'yticklabel',HypnogramLabels(val_min+1:val_max+1),'xticklabel','');
     end
 else
     %Get just the stages that exist
@@ -162,7 +162,11 @@ else
 
         text(stage_times(first_stage),max_y,HypnogramLabels{stg+1},'VerticalAlignment','baseline','HorizontalAlignment','center');
     end
-    set(gca,'yticklabel','')
+    if isempty(artifacts)
+        set(gca,'yticklabel','')
+    else
+        set(gca,'YTick',val_min-1,'YTickLabel','Art')
+    end
 end
 
 if GroupNREMColors %Merge all NREM
@@ -203,7 +207,7 @@ if ~isempty(artifacts)
     artifacts = artifacts(inds);
     artifact_times = artifact_times(inds);
 
-    inds = find(artifacts(1:end-1))
+    inds = find(artifacts(1:end-1));
 
     %Get epoch times
     a = artifact_times(inds);
