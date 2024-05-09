@@ -5,17 +5,17 @@ function sh = hypnoplot(stage_times,stage_vals,varargin)
 %       hyp_handle = hypnoplot(stage_times, stage_vals, <optional arguments>)
 %
 %   Input:
-%       stage_times: 1xN vector of stage times 
+%       stage_times: 1xN vector of stage times
 %             NOTE: Assumes each stage time indicates stage ONSET time, with an epoch ranging from
 %             stage_times(t) to stage_times(t+1)
 %       stage_vals: 1xN vector of stage values (6: Artifact 5: Wake, 4:REM, 3:N1, 2:N2, 1:N3, 0:Undefined)
 %             NOTE: Stage are labeled in the plot order of the y-axis, so N1 = 3 and N3 = 1
-%       
+%
 %   Optional Name-Value Pairs:
 %       'Artifacts': 1xT logical vector of artifacts, must include EITHER Fs or ArtifactTimes
-%       'Fs': Sampling frequency for artifacts. 
+%       'Fs': Sampling frequency for artifacts.
 %             NOTE: Assumes time starts at 0, which is the time of the first stage
-%       'ArtifactTimes': 1xT vector of time values for artifacts 
+%       'ArtifactTimes': 1xT vector of time values for artifacts
 %       'HypnogramLabels': 1x7 cell, stage name labels, default: {'Undef','N3','N2','N1','REM','Wake','Art'}
 %       'LabelPos': 'top' or 'left', label position, default: 'left'
 %       'StageColors': 7x3 double
@@ -26,20 +26,23 @@ function sh = hypnoplot(stage_times,stage_vals,varargin)
 %       hyp_handle: handle to stairs object for hypnogram
 %
 %   Example:
-%       stage_vals = [0 0 0 5 4 3 2 2 6 6 6 2 1 2 3 5 6 5 6 5 6 6 5 5 3 2 1 4 4 6 5 4 0 3 2 1 1 0 0 6];
-%       stage_times = (1:length(stage_vals))*30;
+%       %Simulate a simple hypnogram
+%       stage_vals = [0 0 0 5 5 5 4 3 2 2 2 1 2 1 2 3 5 5 5 1 5 1 2 5 3 2 1 4 4 4 5 4 0 3 2 1 1 5 5 5 0 0 0];
+%       stage_vals(stage_vals <2) = 5;
+%       stage_times = (0:length(stage_vals)-1)*30;
+%       
+%       %Simulate some artifacts
 %       Fs = 200;
-%       ArtifactTimes = (0:max(stage_times))/Fs;
-%       Artifacts = zeros(size(ArtifactTimes));
-%       Artifacts([350*Fs:375*Fs  1050*Fs:10105*Fs 3000*Fs:4000*Fs]) = 1;
+%       dt = 1/Fs;
+%       artifact_times = 0:dt:max(stage_times);
+%       artifacts = rand(size(artifact_times))<.002;
 %       
 %       figure
 %       subplot(211)
-%       hypnoplot(stage_times, stage_vals, 'Artifacts', Artifacts, 'Fs', Fs);
-%       
+%       hypnoplot(stage_times, stage_vals, 'Artifacts', artifacts, 'Fs', Fs);
 %       subplot(212)
-%       hypnoplot(stage_times, stage_vals,'HypnogramLabels', {'U','3','2','1','R','W','A'},'LabelPos','top', 'Artifacts', Artifacts, 'ArtifactTimes', ArtifactTimes);
-%
+%       hypnoplot(stage_times, stage_vals,'HypnogramLabels', {'U','3','2','1','R','W','A'},'LabelPos','top', 'Artifacts', artifacts, 'ArtifactTimes', artifact_times);
+
 %   Copyright 2024 Prerau Lab - http://www.sleepEEG.org
 %   This work is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
 %   (http://creativecommons.org/licenses/by-nc-sa/4.0/)
@@ -113,30 +116,9 @@ if ~isempty(artifacts)
     end
 end
 
-
 %Adds a 30s epoch at the end for plotting
 stage_times(end+1) = stage_times(end)+30;
 stage_vals(end+1) = stage_vals(end);
-
-%Check for artifact inputs
-if ~isempty(artifacts) || ~isempty(artifact_times)
-    %Create a t
-    if ~isempty(Fs) && isempty(artifact_times)
-        t = (0:length(artifacts)-1)/Fs;
-    end
-
-    %Generate a t based on given artifact times
-    if ~isempty(artifact_times)
-        dt = min(diff(artifact_times));
-        t = min(stage_times):dt:max(stage_times);
-        artifacts = logical(histcounts(artifact_times,t));
-    end
-
-    %Interpolate the hypogram to t and insert the artifacts
-    stage_vals = interp1(stage_times, stage_vals, t,'previous');
-    stage_vals(artifacts) = 6;
-    stage_times = t;
-end
 
 %Simplify vector
 inds=[1 find(diff(stage_vals)~=0)+1 length(stage_times)];
@@ -152,7 +134,7 @@ stage_vals(stage_vals>6) = 6;
 sh = stairs(stage_times,stage_vals,'k','linewidth',2);
 
 %Adjust plot to include no stage and artifacts
-val_min = min(stage_vals);
+val_min = min([stage_vals,1]); %Always go down to at least N3
 val_max = max(stage_vals);
 
 %Set ylim range
@@ -162,7 +144,13 @@ max_y = val_max + PlotBuffer;
 hold on;
 
 if strcmpi(LabelPos,'left')
+    if ~isempty(artifacts)
+        labels = HypnogramLabels(val_min+1:val_max+1);
+        labels = [{'Art'} labels(:)'];
+        set(gca,'ytick',[val_min-1 val_min:val_max],'yticklabel',labels,'xticklabel','');
+    else
     set(gca,'ytick',val_min:val_max,'yticklabel',HypnogramLabels(val_min+1:val_max+1),'xticklabel','');
+    end
 else
     %Get just the stages that exist
     stage_list = unique(stage_vals);
@@ -193,10 +181,40 @@ for stage_num = 0:6 %Loop through all stages
     %Plot shaded rectangle
     fill([a;b;b;a],[c;c;d;d], StageColors(stage_num + 1,:),'edgecolor','none')
 end
-
 %Keep hypnogram trace on top
 uistack(sh,'top');
 
+%Plot the artifacts on the bottom
+if ~isempty(artifacts)
+    if ~isempty(Fs) && isempty(artifact_times)
+        artifact_times = (0:length(artifacts)-1)/Fs;
+    end
+
+    art_stage_inds = stage_vals == 6;
+    if any(art_stage_inds)
+        stage_vals(stage_vals ~= 6) = 0;
+        art_stage = interp1(stage_times, stage_vals, artifact_times,'previous','extrap');
+        art_stage(isnan(art_stage)) = 0;
+        artifacts = artifacts | art_stage;
+    end
+
+    %Simplify vector
+    inds=[1 find(diff(artifacts)~=0)+1 length(artifacts)];
+    artifacts = artifacts(inds);
+    artifact_times = artifact_times(inds);
+
+    inds = find(artifacts(1:end-1))
+
+    %Get epoch times
+    a = artifact_times(inds);
+    b = artifact_times(inds+1);
+    c = ones(1,length(a))*(val_min-1);
+    d = ones(1,length(a))*min_y;
+
+    %Plot shaded rectangle
+    fill([a;b;b;a],[c;c;d;d], StageColors(6 + 1,:),'edgecolor','k')
+end
+
 %Set limits
-ylim([min_y max_y]);
-xlim([min(stage_times) max(stage_times)])
+axis tight
+
