@@ -114,7 +114,7 @@ end
 % delta = interp1(linspace(1,N,length(delta_rnd)),delta_rnd,1:N,'spline');
 
 %Compute SO-power
-SO_freqrange = [0.11 2];
+SO_freqrange = [0.3 1.5];
 d = designfilt('bandpassiir', ...       % Response type
     'StopbandFrequency1',SO_freqrange(1)-0.1, ...    % Frequency constraints
     'PassbandFrequency1',SO_freqrange(1), ...
@@ -269,7 +269,7 @@ if plot_on
     figure
     for ss = 1:length(spindle_opts)
         [theta_mean, ~, h_phist, h_pax, ~] = phasehistogram(spindle_stats(ss).spindle_phase,1);
-        h_phist.NumBins = 25;
+        h_phist.NumBins = 50;
         hold on
         set(h_pax,'position',[0.7256    0.3159    0.2967    0.3840]);
     end

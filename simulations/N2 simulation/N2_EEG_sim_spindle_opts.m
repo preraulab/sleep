@@ -6,7 +6,7 @@ function spindle_opts = N2_EEG_sim_spindle_opts(varargin)
 % Inputs:
 %    'ParameterName', ParameterValue - Name-value pairs specifying options for simulating N2 EEG spindles.
 %        Valid parameter names and their default values are:
-%          'phase_pref'           - Preferred phase angle of the spindle, in radians. Default: pi.
+%          'phase_pref'           - Preferred phase angle of the spindle, in radians. Default: 0.
 %          'spindle_freq_mean'    - Mean frequency of the spindle, in Hz. Default: 15.
 %          'spindle_freq_std'     - Standard deviation of the frequency, in Hz. Default: 1.
 %          'spindle_amp_mean'     - Mean amplitude of the spindle, in microvolts. Default: 8.
@@ -28,7 +28,7 @@ function spindle_opts = N2_EEG_sim_spindle_opts(varargin)
 
 
 % Set default values
-defaults.phase_pref = pi;
+defaults.phase_pref = 0;
 defaults.spindle_freq_mean = 15;
 defaults.spindle_freq_std = 1;
 defaults.spindle_amp_mean = 8;
