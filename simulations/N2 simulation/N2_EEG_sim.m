@@ -29,16 +29,16 @@ function [signal, spindle_stats, K_complexes, spindles, slow, delta, noise] = N2
 %Create a sample to run as default
 if nargin == 0
     %Create 1 hour of data
-    Fs = 200;
-    total_time = 3600;
+    Fs = 100;
+    total_time = 3600*10;
     baseline_time = 60*5; %Set first 5 minutes to be baseline
 
-    spindle_opts(1) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',15,'spindle_freq_std',.25,'phase_pref',0);
-    spindle_opts(2) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',12,'spindle_freq_std',.25,'phase_pref',pi/2);
+    spindle_opts(1) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',15,'spindle_freq_std',.25,'phase_pref',-pi);
+    % spindle_opts(2) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',11,'spindle_freq_std',.25,'phase_pref',pi/2);
 
     noise_opts = N2_EEG_sim_noise_opts;
 
-    signal = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts);
+    [signal, spindle_stats, K_complexes, spindles, slow, delta, noise] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts);
 
     return;
 end
@@ -191,13 +191,20 @@ for ss = 1:length(spindle_opts)
     spindle_baseline_rate = spindle_opts(ss).spindle_baseline_rate;
     modulation_factor = spindle_opts(ss).modulation_factor;
     spindle_min_separation = spindle_opts(ss).spindle_min_separation;
+    ctrl_pts = spindle_opts(ss).ctrl_pts;
+    spline_tmax = spindle_opts(ss).spline_tmax;
+    theta_spline = spindle_opts(ss).theta_spline;
+    tension = spindle_opts(ss).tension;
+
+    Fs_sp = 4;
 
     %Set spindle density
-    phase_modulation = (modulation_factor*cos(SO_phase-phase_pref) + modulation_factor)/2;
-    lambda = phase_modulation .* spindle_baseline_rate;
+     spindle_times = ... 
+     spindle_pptimes(Fs, Fs_sp, spindle_baseline_rate, SO_phase, modulation_factor, phase_pref, ctrl_pts, theta_spline, tension, spline_tmax);
+
 
     %Generate Poisson events
-    spindle_inds = poissrnd(lambda/Fs/60,1,N)>0;
+    spindle_inds = histcounts(spindle_times,t);
     spindle_inds(1:baseline_time*Fs) = 0; %Remove all peaks during baseline time
     spindle_inds = find(spindle_inds);
 
@@ -278,9 +285,12 @@ if plot_on
     ax = figdesign(1,1,'orient','landscape','margin',[.1 .1 .05, .3  .03]);
     ax_split = split_axis(ax,[.2 .2 .6], 1);
     axes(ax_split(3))
-    [spect, stimes, sfreqs] = multitaper_spectrogram_mex(signal, Fs, [.5 25], [2 3], [1 .05], 2^10,'constant');
+    [spect, stimes, sfreqs] = multitaper_spectrogram_mex(signal, Fs, [.5 25], [2 3], [1 .05], 2^10,'constant','plot_on',false);
+    imagesc(stimes,sfreqs,pow2db(spect));
+    axis xy;
     climscale; 
     colormap(rainbow4);
+
     axes(ax_split(2))
     hold all
     plot(t,vis_sig)
@@ -296,7 +306,6 @@ if plot_on
     linkaxes(ax_split,'x')
 
     scrollzoompan(ax_split(2));
+end
+end
 
-    set(gcf,'units','normalized','position',[0 0 1 1]);
-end
-end

@@ -29,29 +29,41 @@ function spindle_opts = N2_EEG_sim_spindle_opts(varargin)
 
 % Set default values
 defaults.phase_pref = 0;
+defaults.modulation_factor = 1;
+defaults.spindle_baseline_rate = 5/60;
 defaults.spindle_freq_mean = 15;
 defaults.spindle_freq_std = 1;
 defaults.spindle_amp_mean = 8;
 defaults.spindle_amp_std = 0.5;
 defaults.spindle_dur_mean = 1.5;
 defaults.spindle_dur_std = 0.25;
-defaults.spindle_baseline_rate = 10;
-defaults.modulation_factor = 4;
-defaults.spindle_min_separation = 0.5;
+defaults.spindle_min_separation = 0;
+defaults.ctrl_pts = -3:3:18;
+defaults.spline_tmax = 15;
+defaults.theta_spline = [0, -5, 0, 0.5, 0, 0, 0, 0];
+defaults.tension = 1;
+
+%To add infraslow
+% ctrl_pts =         [    -3,     0, 3, 5, 8, 9, 12, 15, 18  45,  50, 55, 65, 85];
+% theta_spline = log([  1e-5,  1e-2, 1, 2, 1, 1,  1,  1,  1,  1, 1.2, 1,  1,  1]);
 
 % Create input parser
 p = inputParser;
 
+addParameter(p, 'spindle_baseline_rate', defaults.spindle_baseline_rate, @(x) validateattributes(x, {'numeric'}, {'real','scalar','positive'}));
 addParameter(p, 'phase_pref', defaults.phase_pref, @(x) validateattributes(x, {'numeric'}, {'real','scalar','>=',-pi,'<=',pi}));
+addParameter(p, 'modulation_factor', defaults.modulation_factor, @(x) validateattributes(x, {'numeric'}, {'real','scalar','positive'}));
 addParameter(p, 'spindle_freq_mean', defaults.spindle_freq_mean, @(x) validateattributes(x, {'numeric'}, {'real','scalar','positive'}));
 addParameter(p, 'spindle_freq_std', defaults.spindle_freq_std, @(x) validateattributes(x, {'numeric'}, {'real','scalar','positive'}));
 addParameter(p, 'spindle_amp_mean', defaults.spindle_amp_mean, @(x) validateattributes(x, {'numeric'}, {'real','scalar','positive'}));
 addParameter(p, 'spindle_amp_std', defaults.spindle_amp_std, @(x) validateattributes(x, {'numeric'}, {'real','scalar','positive'}));
 addParameter(p, 'spindle_dur_mean', defaults.spindle_dur_mean, @(x) validateattributes(x, {'numeric'}, {'real','scalar','positive'}));
 addParameter(p, 'spindle_dur_std', defaults.spindle_dur_std, @(x) validateattributes(x, {'numeric'}, {'real','scalar','positive'}));
-addParameter(p, 'spindle_baseline_rate', defaults.spindle_baseline_rate, @(x) validateattributes(x, {'numeric'}, {'real','scalar','positive'}));
-addParameter(p, 'modulation_factor', defaults.modulation_factor, @(x) validateattributes(x, {'numeric'}, {'real','scalar','positive'}));
 addParameter(p, 'spindle_min_separation', defaults.spindle_min_separation, @(x) validateattributes(x, {'numeric'}, {'real','scalar','positive'}));
+addParameter(p, 'ctrl_pts', defaults.ctrl_pts, @(x) validateattributes(x, {'numeric'}, {'vector'}));
+addParameter(p, 'spline_tmax', defaults.spline_tmax, @(x) validateattributes(x, {'numeric'}, {'real','scalar','positive'}));
+addParameter(p, 'tension', defaults.tension, @(x) validateattributes(x, {'numeric'}, {'real','scalar','positive'}));
+addParameter(p, 'theta_spline', defaults.theta_spline, @(x) validateattributes(x, {'numeric'}, {'vector'}));
 
 % Parse inputs
 parse(p, varargin{:});
