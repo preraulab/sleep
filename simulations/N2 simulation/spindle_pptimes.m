@@ -36,14 +36,15 @@ function [spindle_times, spindle_train, S, t_spline] = spindle_pptimes(Fs, Fs_sp
 %       spline_tmax = 15; % Maximum time for spline fitting
 %       [spindle_times, spindle_train, S, t_spline] = spindle_pptimes(Fs, Fs_sp, baseline_rate, phase, coupling_mag, phase_pref, ctrl_pts, theta_spline, tension, spline_tmax);
 %
-%   See also: smartresample, poissrnd
+%   See also: poissrnd
 %
 %   Copyright 2024 Prerau Laboratory - http://www.sleepEEG.org
 % *********************************************************************
 
 % Resample phase data if necessary
 if Fs ~= Fs_sp
-    phase = smartresample(phase, Fs, Fs_sp);
+    [d,n]=rat(Fs/Fs_sp);
+    phase=resample(x,n,d,500);
 end
 
 %Set default rate
@@ -143,5 +144,4 @@ spindle_times = t(logical(spindle_train));
 
 % Define the spline times
 t_spline = (0:spline_tmax-1) / Fs_sp;
-
 end

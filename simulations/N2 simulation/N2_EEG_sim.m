@@ -37,8 +37,8 @@ function [signal, spindle_stats, slow_waves, spindles, slow, delta, noise] = N2_
 %Create a sample to run as default
 if nargin == 0
     %Create 2 hours of data
-    Fs = 100;
-    total_time = 3600*4;
+    Fs = 50;
+    total_time = 3600*2;
     baseline_time = 60; %Set first 1 minute to be baseline
 
     %Create different history dependencies for each spindle set
@@ -203,7 +203,7 @@ for ss = 1:length(spindle_opts)
     Fs_sp = Fs;
 
     %Set spindle density
-    spindle_times = ...
+    [spindle_times, ~, S{ss}, t_spline{ss}] = ...
         spindle_pptimes(Fs, Fs_sp, spindle_baseline_rate, SO_phase, modulation_factor, phase_pref, ctrl_pts, theta_spline, tension, spline_tmax);
 
     spindle_times = spindle_times(spindle_times>baseline_time);
@@ -249,20 +249,9 @@ if plot_on
         0.6350    0.0780    0.1840];
 
     [spect, stimes, sfreqs] = multitaper_spectrogram_mex(signal, Fs, [.5 25], [2 3], [1 .05], 2^10,'constant','plot_on',false);
+    [t_sp, b, yhat, dylo, dyhi] = fit_ppsplines(t, SO_phase, spindle_stats, spindle_opts);
 
-    close all;
-    figure
-    %Plot phase histogram
-    for ss = 1:length(spindle_opts)
-        [theta_mean(ss), ~, h_phist, h_pax, ~] = phasehistogram(spindle_stats(ss).spindle_phase,1);
-        h_phist.FaceColor = plot_colors(ss,:);
-        h_phist.FaceAlpha = .4;
-        h_phist.NumBins = 50;
-        hold on
-    end
-    title(['Theta: ' num2str(theta_mean)])
-    set(h_pax,'position',[0.7636    0.5732    0.2087    0.3507]);
-
+    fh=figure;
     %Plot simulated signal
     ax = figdesign(1,1,'orient','landscape','margin',[.1 .1 .05, .33  .03]);
     set(gcf,"Position",[ 0.2948    0.1951    0.5866    0.5979]);
@@ -271,7 +260,6 @@ if plot_on
 
     %Plot spectrogram
     axes(ax_split(1))
-
     imagesc(stimes,sfreqs,pow2db(spect));
     axis xy;
     climscale;
@@ -287,6 +275,7 @@ if plot_on
         dataTipTextRow("Dur.",cat(2,spindle_stats.spindle_durations)),...
         dataTipTextRow("Phase",cat(2,spindle_stats.spindle_phase))];
     s.DataTipTemplate.DataTipRows = dtRows;
+    s.DataTipTemplate.FontSize = 16;
 
     set(gca,'fontsize',15,'xtick',[]);
     ylabel('Frequency (Hz)');
@@ -327,34 +316,132 @@ if plot_on
 
     hist_ax = axes('Position',[  0.7552    0.1290    0.2346    0.3415]);
     hold on
+
     for ss = 1:length(spindle_stats)
-        spindle_train = histcounts(spindle_stats(ss).spindle_times, 1:max(spindle_stats(ss).spindle_times));
-        hist_length = 60;
-        Hist = zeros(length(spindle_train),hist_length);
-        for i = 1:hist_length
-            Hist(:,i) = circshift(spindle_train,i);
-        end
+        hold on
+        c = exp(b{ss}(1));
+        fill([t_sp{ss}, fliplr(t_sp{ss})], [yhat{ss} / c - dylo{ss} / c; flipud(yhat{ss} / c + dyhi{ss} / c)],  plot_colors(ss,:), 'FaceAlpha', 0.2, 'EdgeColor', 'none');
+        plot(t_sp{ss}, yhat{ss} / c,  'color', plot_colors(ss,:), 'linewidth', 2);
+        axis tight;
+        xlabel('Lag (s)');
+        ylabel('Modulation');
 
-        y = spindle_train;
-
-        % Fit point process GLM
-        [b2, ~, stats2] = glmfit(Hist, y, 'poisson');
-        [yhat2, dylo2, dyhi2] = glmval(b2, eye(length(b2) - 1), 'log', stats2);
-
-
-        t_spline=1:hist_length;
-        c = exp(b2(1));
-        hold on;
-        plot(t_spline,(yhat2)/c,'color',plot_colors(ss,:),'linewidth',3)
-        fill([t_spline, fliplr(t_spline)], [yhat2 / c - dylo2 / c; flipud(yhat2 / c + dyhi2 / c)], plot_colors(ss,:), 'FaceAlpha', 0.4, 'EdgeColor', 'none');
+        xlabel("Time Since Last Spindle (s)")
+        ylabel('Modulation Factor')
+        title('History Modulation Curve')
+        set(hist_ax,'fontsize',15)
     end
-    xlabel("Time Since Last Spindle (s)")
-    ylabel('Modulation Factor')
-    title('History Modulation Curve')
-    set(hist_ax,'fontsize',15)
+    axis tight;
+    ylim([0 min(max(ylim(gca)),10)]);
+
+
+    h_pax = polaraxes('position',[0.7636    0.5732    0.2087    0.3507]);
+    %Plot phase histogram
+    for ss = 1:length(spindle_opts)
+        b1 = (b{ss}(end-1));
+        b2 = (b{ss}(end));
+
+        theta_mod(ss) = atan2(b1,b2);
+        rho_mod(ss) = sqrt(b1.^2+b2.^2);
+
+        %Compute the mean population vector
+        vect_mean = mean(exp(1i*spindle_stats(ss).spindle_phase));
+
+        %Get the mean magnitude and angle
+        rho_samp(ss) = abs(vect_mean);
+        theta_samp(ss) = angle(vect_mean);
+
+        %Plot histogram
+        h_phist = polarhistogram(spindle_stats(ss).spindle_phase,'Normalization','pdf');
+        h_pax.ThetaAxisUnits = 'radians';
+        h_pax.ThetaTick = 0:pi/4:2*pi;
+        h_pax.ThetaTickLabel = {'0','\pi/4','\pi/2','3\pi/4' '\pm\pi','-3\pi/4', '-\pi/2','-\pi/4'};
+        h_pax.FontSize = 14;
+
+        %Add mean arrow
+        hold on
+        polarplot([theta_mod(ss) theta_mod(ss)],[0 rho_mod(ss)],'linestyle','-','color',plot_colors(ss,:),'linewidth',3);
+        polarplot([theta_samp(ss) theta_samp(ss)],[0 rho_samp(ss)],'linestyle','--','color',plot_colors(ss,:),'linewidth',2);
+
+        h_phist.FaceColor = plot_colors(ss,:);
+        h_phist.FaceAlpha = .4;
+        h_phist.NumBins = 50;
+        hold on
+    end
+    title(['Theta: ' num2str(theta_mod)])
 
     axes(ax_split(1))
     scrollzoompan(ax_split(1));
 end
+end
 
+function [t_sp, b, yhat, dylo, dyhi] = fit_ppsplines(t, SO_phase, spindle_stats,spindle_opts)
+%Downsample to 1s bins
+dt = .25;
+t_train = t(1):dt:t(end);
 
+for ss = 1:length(spindle_stats)
+    %Remove spindles where more than one falls in a bin
+    st_inds = find(diff([0 spindle_stats(ss).spindle_times])>=dt);
+    spindle_stats(ss).spindle_times = spindle_stats(ss).spindle_times(st_inds);
+    spindle_stats(ss).spindle_phase = spindle_stats(ss).spindle_phase(st_inds);
+
+    %Interpolate to dt
+    spindle_train = histcounts(spindle_stats(ss).spindle_times, [t_train inf]);
+    t_sp{ss} = 0:dt:spindle_opts(ss).spline_tmax;
+    SO_int = interp1(t,SO_phase, t_train);
+    SO_int(logical(spindle_train)) = spindle_stats(ss).spindle_phase;
+
+    ctrl_pts = spindle_opts(ss).ctrl_pts/dt;
+    numknots = length(ctrl_pts);
+    tension = spindle_opts(ss).tension;
+
+    % Construct spline matrix
+    S = zeros(length(t_sp{ss}), numknots);
+
+    for i = 1:length(t_sp{ss})
+        % Find the nearest control point indices
+        nearest_c_pt_index = find(ctrl_pts < i, 1, 'last');
+
+        % Boundary checks for control points
+        if nearest_c_pt_index < 2 || nearest_c_pt_index > numknots - 2
+            continue;
+        end
+
+        nearest_c_pt_time = ctrl_pts(nearest_c_pt_index);
+        next_c_pt_time = ctrl_pts(nearest_c_pt_index + 1);
+        prev_c_pt_time = ctrl_pts(nearest_c_pt_index - 1);
+        next2 = ctrl_pts(nearest_c_pt_index + 2);
+
+        % Compute the normalized parameter u
+        u = (i - nearest_c_pt_time) / (next_c_pt_time - nearest_c_pt_time);
+
+        % Calculate the lengths for tension parameter l1 and l2
+        l1 = (next_c_pt_time - prev_c_pt_time) / (next_c_pt_time - nearest_c_pt_time);
+        l2 = (next2 - nearest_c_pt_time) / (next_c_pt_time - nearest_c_pt_time);
+
+        % Calculate spline coefficients p
+        p = [u^3, u^2, u, 1] * [-tension / l1, 2 - tension / l2, tension / l1 - 2, tension / l2;
+            2 * tension / l1, tension / l2 - 3, 3 - 2 * tension / l1, -tension / l2;
+            -tension / l1, 0, tension / l1, 0;
+            0, 1, 0, 0];
+
+        % Assign the spline coefficients to the spline matrix S
+        S(i, nearest_c_pt_index - 1:nearest_c_pt_index + 2) = p;
+    end
+
+    hist_length = length(t_sp{ss});
+    Hist = zeros(length(spindle_train),hist_length);
+    for i = 1:hist_length
+        Hist(:,i) = circshift(spindle_train,i);
+    end
+    X = Hist * S;
+    X = [X sin(SO_int') cos(SO_int')];
+    y = spindle_train;
+
+    [b{ss}, ~, stats] = glmfit(X, y, 'poisson');
+    S_fit = S;
+    S_fit(1,size(X,2)) = 0;
+    [yhat{ss}, dylo{ss}, dyhi{ss}] = glmval(b{ss}, S_fit, 'log', stats);
+end
+end
