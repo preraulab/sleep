@@ -38,7 +38,7 @@ function [spindle_times, spindle_train, S, t_spline] = spindle_pptimes(Fs, Fs_sp
 %
 %   See also: smartresample, poissrnd
 %
-%   Copyright 2023 Your Name. - http://www.yourwebsite.org
+%   Copyright 2024 Prerau Laboratory - http://www.sleepEEG.org
 % *********************************************************************
 
 % Resample phase data if necessary
@@ -63,7 +63,7 @@ end
 
 % Define spline parameters
 if isempty(theta_spline)
-    theta_spline = [-8, -5, 0, 0.5, 0, 0, 0, 0]; 
+    theta_spline = [-8, -5, 0, 0.5, 0, 0, 0, 0];
 end
 
 % Define tension parameter
@@ -81,39 +81,43 @@ ctrl_pts = ctrl_pts * Fs_sp;
 % Compute phase model
 phase_lambda = coupling_mag * cos(phase - phase_pref);
 
+
 numknots = length(ctrl_pts);
 
 % Construct spline matrix
 S = zeros(spline_tmax, numknots);
-for i = 1:spline_tmax
-    % Find the nearest control point indices
-    nearest_c_pt_index = find(ctrl_pts < i, 1, 'last');
-    
-    % Boundary checks for control points
-    if nearest_c_pt_index < 2 || nearest_c_pt_index > numknots - 2
-        continue;
+
+if any(theta_spline)
+    for i = 1:spline_tmax
+        % Find the nearest control point indices
+        nearest_c_pt_index = find(ctrl_pts < i, 1, 'last');
+
+        % Boundary checks for control points
+        if nearest_c_pt_index < 2 || nearest_c_pt_index > numknots - 2
+            continue;
+        end
+
+        nearest_c_pt_time = ctrl_pts(nearest_c_pt_index);
+        next_c_pt_time = ctrl_pts(nearest_c_pt_index + 1);
+        prev_c_pt_time = ctrl_pts(nearest_c_pt_index - 1);
+        next2 = ctrl_pts(nearest_c_pt_index + 2);
+
+        % Compute the normalized parameter u
+        u = (i - nearest_c_pt_time) / (next_c_pt_time - nearest_c_pt_time);
+
+        % Calculate the lengths for tension parameter l1 and l2
+        l1 = (next_c_pt_time - prev_c_pt_time) / (next_c_pt_time - nearest_c_pt_time);
+        l2 = (next2 - nearest_c_pt_time) / (next_c_pt_time - nearest_c_pt_time);
+
+        % Calculate spline coefficients p
+        p = [u^3, u^2, u, 1] * [-tension / l1, 2 - tension / l2, tension / l1 - 2, tension / l2;
+            2 * tension / l1, tension / l2 - 3, 3 - 2 * tension / l1, -tension / l2;
+            -tension / l1, 0, tension / l1, 0;
+            0, 1, 0, 0];
+
+        % Assign the spline coefficients to the spline matrix S
+        S(i, nearest_c_pt_index - 1:nearest_c_pt_index + 2) = p;
     end
-    
-    nearest_c_pt_time = ctrl_pts(nearest_c_pt_index);
-    next_c_pt_time = ctrl_pts(nearest_c_pt_index + 1);
-    prev_c_pt_time = ctrl_pts(nearest_c_pt_index - 1);
-    next2 = ctrl_pts(nearest_c_pt_index + 2);
-    
-    % Compute the normalized parameter u
-    u = (i - nearest_c_pt_time) / (next_c_pt_time - nearest_c_pt_time);
-    
-    % Calculate the lengths for tension parameter l1 and l2
-    l1 = (next_c_pt_time - prev_c_pt_time) / (next_c_pt_time - nearest_c_pt_time);
-    l2 = (next2 - nearest_c_pt_time) / (next_c_pt_time - nearest_c_pt_time);
-    
-    % Calculate spline coefficients p
-    p = [u^3, u^2, u, 1] * [-tension / l1, 2 - tension / l2, tension / l1 - 2, tension / l2;
-                            2 * tension / l1, tension / l2 - 3, 3 - 2 * tension / l1, -tension / l2;
-                            -tension / l1, 0, tension / l1, 0;
-                            0, 1, 0, 0];
-    
-    % Assign the spline coefficients to the spline matrix S
-    S(i, nearest_c_pt_index - 1:nearest_c_pt_index + 2) = p;
 end
 
 % Transpose the spline matrix to optimize for the loop
@@ -126,10 +130,10 @@ lambda = zeros(N, 1);
 for i = spline_tmax + 1:N
     % Extract the segment of the spindle train for spline fitting
     spindle_seg = spindle_train(i - 1:-1:i - spline_tmax);
-    
+
     % Calculate the firing rate lambda
     lambda(i) = exp(theta_spline * (S * spindle_seg) + phase_lambda(i) + log(baseline_rate));
-    
+
     % Generate the spike train
     spindle_train(i) = min(poissrnd(lambda(i) / Fs_sp), 1);
 end

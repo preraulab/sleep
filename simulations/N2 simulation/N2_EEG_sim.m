@@ -1,4 +1,4 @@
-function [signal, spindle_stats, K_complexes, spindles, slow, delta, noise] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts, plot_on)
+function [signal, spindle_stats, slow_waves, spindles, slow, delta, noise] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts, plot_on)
 %N2_EEG_SIM Simulates N2 sleep stage EEG signals with spindle and K-complex events
 %
 % [signal, spindle_stats] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts,  plot_on)
@@ -17,32 +17,52 @@ function [signal, spindle_stats, K_complexes, spindles, slow, delta, noise] = N2
 %
 % Example usage:
 %       %Create 1 hour of data
-%       Fs = 200;
+%       Fs = 100;
 %       total_time = 3600;
-%       phase_pref = -3*pi/4;
-%       signal = N2_EEG_sim(Fs, total_time);
+%       baseline_time = 60; %Set first 1 minute to be baseline
 %
-%    Copyright 2024 Michael J. Prerau Laboratory. - http://www.sleepEEG.org
-%    Authors: Michael J. Prerau, Ph.D.
+%       %Create two kinds of spindles with different properties
+%       spindle_opts(1) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',15,'spindle_freq_std',.125,'phase_pref',0,'modulation_factor',.3);
+%       spindle_opts(2) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',13,'spindle_freq_std',.125,'phase_pref',pi/4,'modulation_factor',.4);
+%
+%       %Use default noise
+%       noise_opts = N2_EEG_sim_noise_opts;
+%
+%       %Generate the signal
+%       signal = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts);
+%
+%    Copyright 2024 Prerau Laboratory. - http://www.sleepEEG.org
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %Create a sample to run as default
 if nargin == 0
-    %Create 1 hour of data
+    %Create 2 hours of data
     Fs = 100;
-    total_time = 3600*10;
-    baseline_time = 60*5; %Set first 5 minutes to be baseline
+    total_time = 3600*4;
+    baseline_time = 60; %Set first 1 minute to be baseline
 
-    spindle_opts(1) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',15,'spindle_freq_std',.25,'phase_pref',-pi);
-    % spindle_opts(2) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',11,'spindle_freq_std',.25,'phase_pref',pi/2);
+    %Create different history dependencies for each spindle set
+    ctrl_pts1 =         [    -3,     0, 3, 4.5, 8, 9, 12, 15, 18  45,  50, 55, 65, 85];
+    theta_spline1 = log([  1e-5,  1e-2, 1, 2, 1, 1,  1,  1,  1,  1, 1.5, 1,  1,  1]);
+
+    ctrl_pts2 =        [    -3,     0,  4, 6, 8, 9, 12, 15, 18  40,  45, 55, 65, 85];
+    theta_spline2 = log([  1e-5,  1e-2, 1, 3, 1, 1,  1,  1,  1,  1, 1.2, 1,  1,  1]);
+
+
+    spindle_opts(1) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',15,'spindle_freq_std',.125,...
+        'phase_pref',0,'modulation_factor',.7,'ctrl_pts',ctrl_pts1,'theta_spline',theta_spline1);
+
+    spindle_opts(2) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',10,'spindle_freq_std',.125,...
+        'phase_pref',pi/4,'modulation_factor',.6,'ctrl_pts',ctrl_pts2,'theta_spline',theta_spline2);
 
     noise_opts = N2_EEG_sim_noise_opts;
 
-    [signal, spindle_stats, K_complexes, spindles, slow, delta, noise] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts);
+    [signal, spindle_stats, slow_waves, spindles, slow, delta, noise] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts);
 
     return;
 end
 
+%Force reasonable frequencies
 assert(Fs>0, 'Must have positive sampling frequency');
 assert(total_time>0, 'Must have positive total time');
 
@@ -68,52 +88,37 @@ end
 N = total_time*Fs;
 t = (1:N)/Fs;
 
-%% Generate K-Complexes
-K_complexes = zeros(1,N);
+%% Generate Slow Waves
+slow_waves = zeros(1,N);
 
-%Set KC rate (events/minute) to be lambda of a Poisson process
-kc_rate = 40;
+%Set SW rate (events/minute) to be lambda of a Poisson process
+SW_rate = 40;
 
 %Generate Poisson events
-kc_times = find(poissrnd(kc_rate/60/Fs, 1, N));
-%Set min spacing between events
-kc_min_separation = 0;
+SW_times = find(poissrnd(SW_rate/60/Fs, 1, N));
 
-%Loop through all events and generate KCs
-for ii = 1:length(kc_times)
-    %Check for overlap
-    if ii>1 && (kc_times(ii) - kc_times(ii-1))/Fs > kc_min_separation
+%Loop through all events and generate SWs
+for ii = 1:length(SW_times)
 
-        %Simulate KC waveform
-        kc_duration = 2;
-        kc_amp = 10*(rand + .5);
-        kc_t = linspace(0,kc_duration,kc_duration*Fs);
+    %Simulate KC waveform
+    SW_duration = 1.5+rand/5;
+    SW_amp = 10*(rand + .5);
+    SW_t = linspace(0,SW_duration,SW_duration*Fs);
 
-        kc = (sin(.75*2*pi*kc_t) + sin(.5*kc_t-pi)) .* hanning(length(kc_t))'*kc_amp;
+    %Generate a parametric slow wave
+    SW = (sin(.75*2*pi*SW_t) + sin(.5*SW_t-pi)) .* hanning(length(SW_t))'*SW_amp;
 
-        %Add KC to time series
-        inds = kc_times(ii):min((kc_times(ii)+length(kc)-1), N);
-        K_complexes(inds) = K_complexes(inds) + kc(1:length(inds));
+    %Add SW to time series
+    inds = round(SW_t*Fs+SW_times(ii)-SW_duration*Fs/2);
+
+    if all(inds>1 & inds<N)
+        slow_waves(inds) = SW;
     end
 end
 
-%% Generate "slow" and "delta" waveforms by spline interpolation
+%% Generate "slow" and "delta" waveforms through filtered white noise
 
-% %Create low-res random ~1Hz noise
-% slow_rnd = randn(1,round(N/60/Fs*120))*2;
-% slow_rnd([1 end]) = 0; %Keep spline well-behaved
-% 
-% %Interpolate the noise to make a slow component
-% slow = interp1(linspace(1,N,length(slow_rnd)),slow_rnd,1:N,'spline');
-% 
-% %Create low-res random ~5Hz noise
-% delta_rnd = randn(1,round(N/60/Fs*120*5))*1;
-% delta_rnd([1 end]) = 0; %Keep spline well-behaved
-% 
-% %Interpolate the noise to make a slow component
-% delta = interp1(linspace(1,N,length(delta_rnd)),delta_rnd,1:N,'spline');
-
-%Compute SO-power
+%Compute slow data
 SO_freqrange = [0.3 1.5];
 d = designfilt('bandpassiir', ...       % Response type
     'StopbandFrequency1',SO_freqrange(1)-0.1, ...    % Frequency constraints
@@ -129,7 +134,7 @@ d = designfilt('bandpassiir', ...       % Response type
 
 slow = filtfilt(d,randn(1,N));
 
-%Compute SO-power
+%Compute delta data
 SO_freqrange = [1.5 5];
 d = designfilt('bandpassiir', ...       % Response type
     'StopbandFrequency1',SO_freqrange(1)-1, ...    % Frequency constraints
@@ -145,7 +150,6 @@ d = designfilt('bandpassiir', ...       % Response type
 
 delta = filtfilt(d,randn(1,N))*10;
 
-
 %% Generate colored noise
 %1/f^alpha
 
@@ -153,10 +157,12 @@ cn = dsp.ColoredNoise('SamplesPerFrame', N, 'InverseFrequencyPower', noise_opts.
 noise = cn()*noise_opts.noise_factor;
 noise = noise';
 
-%% Create baseline signal and compute slow oscillation
+%% Create baseline signal
+baseline_signal = double(slow_waves + slow + delta + noise);
 
+%% Compute SO
 
-%Compute SO-power
+%Compute SO band filter
 SO_freqrange = [.3 1.5];
 d = designfilt('bandpassiir', ...       % Response type
     'StopbandFrequency1',SO_freqrange(1)-0.1, ...    % Frequency constraints
@@ -170,16 +176,15 @@ d = designfilt('bandpassiir', ...       % Response type
     'MatchExactly','passband', ...   % Design method options
     'SampleRate',Fs);
 
-SO_power = filtfilt(d,double(K_complexes + slow + delta + noise ));
+SO_EEG = filtfilt(d,baseline_signal);
 
 %Extract SO-phase
-SO_phase = angle(hilbert(SO_power));
+SO_phase = angle(hilbert(SO_EEG));
 
+spindles = zeros(length(spindle_opts),N);
 
 %% Generate spindles
 for ss = 1:length(spindle_opts)
-    spindles = zeros(1,N);
-
     %Extract info from structure
     phase_pref = spindle_opts(ss).phase_pref;
     spindle_freq_mean = spindle_opts(ss).spindle_freq_mean;
@@ -190,122 +195,166 @@ for ss = 1:length(spindle_opts)
     spindle_dur_std = spindle_opts(ss).spindle_dur_std;
     spindle_baseline_rate = spindle_opts(ss).spindle_baseline_rate;
     modulation_factor = spindle_opts(ss).modulation_factor;
-    spindle_min_separation = spindle_opts(ss).spindle_min_separation;
     ctrl_pts = spindle_opts(ss).ctrl_pts;
     spline_tmax = spindle_opts(ss).spline_tmax;
     theta_spline = spindle_opts(ss).theta_spline;
     tension = spindle_opts(ss).tension;
 
-    Fs_sp = 4;
+    Fs_sp = Fs;
 
     %Set spindle density
-     spindle_times = ... 
-     spindle_pptimes(Fs, Fs_sp, spindle_baseline_rate, SO_phase, modulation_factor, phase_pref, ctrl_pts, theta_spline, tension, spline_tmax);
+    spindle_times = ...
+        spindle_pptimes(Fs, Fs_sp, spindle_baseline_rate, SO_phase, modulation_factor, phase_pref, ctrl_pts, theta_spline, tension, spline_tmax);
 
+    spindle_times = spindle_times(spindle_times>baseline_time);
 
-    %Generate Poisson events
-    spindle_inds = histcounts(spindle_times,t);
-    spindle_inds(1:baseline_time*Fs) = 0; %Remove all peaks during baseline time
-    spindle_inds = find(spindle_inds);
+    spindle_durations = nan(1,length(spindle_times));
+    spindle_amps = nan(1,length(spindle_times));
+    spindle_freqs = nan(1,length(spindle_times));
 
-    spindle_durations = nan(1,length(spindle_inds));
-    spindle_amps = nan(1,length(spindle_inds));
-    spindle_freqs = nan(1,length(spindle_inds));
+    for ii = 1:length(spindle_times)
+        spindle_durations(ii) = max(spindle_dur_mean + randn*spindle_dur_std,0);
+        spindle_amps(ii) = max(spindle_amp_mean + randn*spindle_amp_std, 0);
+        spindle_freqs(ii) = max(spindle_freq_mean + randn*spindle_freq_std,0);
 
-    %Loop through all events and generate spindles
-    valid_inds = true(1, length(spindle_inds));
-    last_spindle_time = spindle_inds(1);
+        sp_t = linspace(0,spindle_durations(ii),round(spindle_durations(ii)*Fs));
+        spindle = sin(2*pi*sp_t*spindle_freqs(ii)) .* hanning(length(sp_t))'*spindle_amps(ii);
+        sp_inds = round((sp_t+spindle_times(ii)-spindle_durations(ii)/2)*Fs);
 
-    for ii = 1:length(spindle_inds)
-        %Check for overlap
-        if ii>1 && (spindle_inds(ii) - last_spindle_time)/Fs > spindle_min_separation
-            %Simulate spindle waveform
-            spindle_duration = max(spindle_dur_mean + randn*spindle_dur_std,0);
-            spindle_amp = max(spindle_amp_mean + randn*spindle_amp_std, 0);
-            spindle_freq = max(spindle_freq_mean + randn*spindle_freq_std,0);
-
-            sp_t = linspace(0,spindle_duration,spindle_duration*Fs);
-            spindle = sin(2*pi*sp_t*spindle_freq) .* hanning(length(sp_t))'*spindle_amp;
-
-            %Add spindle to time series
-            start_ind = max(spindle_inds(ii) - round(spindle_duration/2)*Fs,1);
-            inds = start_ind:min((start_ind+length(spindle)-1), N);
-            spindles(inds) = spindles(inds) + spindle(1:length(inds));
-            last_spindle_time = spindle_inds(ii);
-
-            spindle_durations(ii) = spindle_duration;
-            spindle_amps(ii) = spindle_amp;
-            spindle_freqs(ii) = spindle_freq;
-
-        elseif ii>1
-            valid_inds(ii) = false;
+        if all(sp_inds>1 & sp_inds<N)
+            spindles(ss,sp_inds) = spindle;
         end
     end
 
-    spindle_stats(ss).spindle_times = spindle_inds(valid_inds)/Fs;
-    spindle_stats(ss).spindle_freqs = spindle_freqs(valid_inds);
-    spindle_stats(ss).spindle_amps = spindle_amps(valid_inds);
-    spindle_stats(ss).spindle_durations = spindle_durations(valid_inds);
-    spindle_stats(ss).spindle_phase = SO_phase(spindle_inds(valid_inds));
-
-
-    %Add spindles to the signal
-    signal = K_complexes + slow + delta + noise + spindles;
+    spindle_stats(ss).spindle_times = spindle_times; %#ok<*AGROW>
+    spindle_stats(ss).spindle_freqs = spindle_freqs;
+    spindle_stats(ss).spindle_amps = spindle_amps;
+    spindle_stats(ss).spindle_durations = spindle_durations;
+    spindle_stats(ss).spindle_phase = SO_phase(round(spindle_times*Fs));
 end
+
+%Add spindles to the signal
+signal = baseline_signal + sum(spindles,1);
 
 %Convert spindle inds into times
 %% Plot signal
-%Create standard visualization filter
-SO_freqrange = [.3 35];
-d = designfilt('bandpassiir', ...       % Response type
-    'StopbandFrequency1',.01, ...    % Frequency constraints
-    'PassbandFrequency1',SO_freqrange(1), ...
-    'PassbandFrequency2',SO_freqrange(2), ...
-    'StopbandFrequency2',SO_freqrange(2)+2, ...
-    'StopbandAttenuation1',60, ...   % Magnitude constraints
-    'PassbandRipple',1, ...
-    'StopbandAttenuation2',60, ...
-    'DesignMethod','ellip', ...      % Design method
-    'MatchExactly','passband', ...   % Design method options
-    'SampleRate',Fs);
-
-vis_sig = filtfilt(d,double(signal));
-
 if plot_on
+    plot_colors = ...
+        [     0    0.4470    0.7410;
+        0.8500    0.3250    0.0980;
+        0.9290    0.6940    0.1250;
+        0.4940    0.1840    0.5560;
+        0.4660    0.6740    0.1880;
+        0.3010    0.7450    0.9330;
+        0.6350    0.0780    0.1840];
+
+    [spect, stimes, sfreqs] = multitaper_spectrogram_mex(signal, Fs, [.5 25], [2 3], [1 .05], 2^10,'constant','plot_on',false);
+
     close all;
     figure
+    %Plot phase histogram
     for ss = 1:length(spindle_opts)
-        [theta_mean, ~, h_phist, h_pax, ~] = phasehistogram(spindle_stats(ss).spindle_phase,1);
+        [theta_mean(ss), ~, h_phist, h_pax, ~] = phasehistogram(spindle_stats(ss).spindle_phase,1);
+        h_phist.FaceColor = plot_colors(ss,:);
+        h_phist.FaceAlpha = .4;
         h_phist.NumBins = 50;
         hold on
-        set(h_pax,'position',[0.7256    0.3159    0.2967    0.3840]);
     end
     title(['Theta: ' num2str(theta_mean)])
+    set(h_pax,'position',[0.7636    0.5732    0.2087    0.3507]);
 
-    ax = figdesign(1,1,'orient','landscape','margin',[.1 .1 .05, .3  .03]);
-    ax_split = split_axis(ax,[.2 .2 .6], 1);
-    axes(ax_split(3))
-    [spect, stimes, sfreqs] = multitaper_spectrogram_mex(signal, Fs, [.5 25], [2 3], [1 .05], 2^10,'constant','plot_on',false);
+    %Plot simulated signal
+    ax = figdesign(1,1,'orient','landscape','margin',[.1 .1 .05, .33  .03]);
+    set(gcf,"Position",[ 0.2948    0.1951    0.5866    0.5979]);
+
+    ax_split = split_axis(ax,[.7 .15 .15], 1);
+
+    %Plot spectrogram
+    axes(ax_split(1))
+
     imagesc(stimes,sfreqs,pow2db(spect));
     axis xy;
-    climscale; 
+    climscale;
+    colorbar_noresize;
     colormap(rainbow4);
 
-    axes(ax_split(2))
-    hold all
-    plot(t,vis_sig)
-    plot(t,SO_power);
+    hold on
+    s = scatter(cat(2,spindle_stats.spindle_times),cat(2,spindle_stats.spindle_freqs),40,'k','filled');
+    %Add informative datatips to each spindle
+    dtRows = [dataTipTextRow("Time",cat(2,spindle_stats.spindle_times)),...
+        dataTipTextRow("Freq.",cat(2,spindle_stats.spindle_freqs)),...
+        dataTipTextRow("Amp.",cat(2,spindle_stats.spindle_amps)),...
+        dataTipTextRow("Dur.",cat(2,spindle_stats.spindle_durations)),...
+        dataTipTextRow("Phase",cat(2,spindle_stats.spindle_phase))];
+    s.DataTipTemplate.DataTipRows = dtRows;
 
-    axes(ax_split(1))
-    yyaxis left;
-    plot(t,SO_power);
-
-    yyaxis right;
-    plot(t, SO_phase)
-    set(gca,'ytick',[-1 -1/2 0 1/2 1]*pi,'yticklabel',{'-\pi' '-\pi/2' '0' '\pi/2' '\pi'});
+    set(gca,'fontsize',15,'xtick',[]);
+    ylabel('Frequency (Hz)');
+    title('Simulated N2 EEG','FontSize',30);
+    axis tight
     linkaxes(ax_split,'x')
 
-    scrollzoompan(ax_split(2));
+    %Plot Signal
+    axes(ax_split(2))
+    hold all
+    plot(t,signal)
+
+    set(gca,'fontsize',15);
+    xlabel('Time (s)');
+    ylabel('mV');
+    ylim([-55 55])
+
+    %Plot SO and Phase on the same axis
+    %SO
+    axes(ax_split(3))
+    yyaxis left;
+    plot(t,SO_EEG,'linewidth',2);
+    ylabel('SO (mV)')
+    set(gca,'fontsize',15);
+    ylim(gca,[-55 55])
+
+    %Phase
+    yyaxis right;
+    plot(t, SO_phase,'color','r')
+    set(gca,'ytick',[-1 -1/2 0 1/2 1]*pi,'yticklabel',{'-\pi' '-\pi/2' '0' '\pi/2' '\pi'});
+    ylabel('SO Phase (rad)');
+    ylim([-pi pi])
+
+    xlabel('Time (s)')
+    set(gca,'fontsize',15);
+
+    xlim([min(t) max(t)])
+
+    hist_ax = axes('Position',[  0.7552    0.1290    0.2346    0.3415]);
+    hold on
+    for ss = 1:length(spindle_stats)
+        spindle_train = histcounts(spindle_stats(ss).spindle_times, 1:max(spindle_stats(ss).spindle_times));
+        hist_length = 60;
+        Hist = zeros(length(spindle_train),hist_length);
+        for i = 1:hist_length
+            Hist(:,i) = circshift(spindle_train,i);
+        end
+
+        y = spindle_train;
+
+        % Fit point process GLM
+        [b2, ~, stats2] = glmfit(Hist, y, 'poisson');
+        [yhat2, dylo2, dyhi2] = glmval(b2, eye(length(b2) - 1), 'log', stats2);
+
+
+        t_spline=1:hist_length;
+        c = exp(b2(1));
+        hold on;
+        plot(t_spline,(yhat2)/c,'color',plot_colors(ss,:),'linewidth',3)
+        fill([t_spline, fliplr(t_spline)], [yhat2 / c - dylo2 / c; flipud(yhat2 / c + dyhi2 / c)], plot_colors(ss,:), 'FaceAlpha', 0.4, 'EdgeColor', 'none');
+    end
+    xlabel("Time Since Last Spindle (s)")
+    ylabel('Modulation Factor')
+    title('History Modulation Curve')
+    set(hist_ax,'fontsize',15)
+
+    axes(ax_split(1))
+    scrollzoompan(ax_split(1));
 end
-end
+
 
