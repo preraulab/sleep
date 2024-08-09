@@ -9,6 +9,7 @@ function [signal, sim_features, components] = N2_EEG_sim(varargin)
 %       'total_time': double - Total time of the signal to be simulated in seconds (Default: 3600)
 %       'baseline_time': double - Amount of the signal without peaks to act as a detection baseline (Default: 30)
 %       'spindle_opts': struct - Array of spindle options structures (one for each spindle set) from N2_EEG_sim_spindle_opts() (Default: N2_EEG_sim_spindle_opts())
+%                                Pass in empty [] for no spindles
 %       'noise_opts': struct - Noise options structure from N2_EEG_sim_noise_opts() (Default: N2_EEG_sim_noise_opts())
 %       'plot_on': logical - Boolean flag to plot the generated signal or not (Default: true)
 %
@@ -83,7 +84,7 @@ if nargin == 1 & strcmpi(varargin{1},'demo')
         'phase_pref',pi/4,'modulation_factor',.6,'ctrl_pts',ctrl_pts2,'theta_spline',theta_spline2);
 
     %Set noise level
-    noise_opts = N2_EEG_sim_noise_opts('noise_factor',5,'artifact_rate',1+0/3600);
+    noise_opts = N2_EEG_sim_noise_opts('noise_factor',5,'artifact_rate',10/3600);
 
     %Generate simulation
     [signal, sim_features.spindles, components] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts);
@@ -106,8 +107,8 @@ default_plot_on = true;
 addOptional(p, 'Fs', default_Fs, @(x) validateattributes(x, {'numeric'}, {'positive', 'scalar'}));
 addOptional(p, 'total_time', default_total_time, @(x) validateattributes(x, {'numeric'}, {'positive', 'scalar'}));
 addOptional(p, 'baseline_time', default_baseline_time, @(x) validateattributes(x, {'numeric'}, {'positive', 'scalar'}));
-addOptional(p, 'spindle_opts', default_spindle_opts, @(x) isempty(x) || validateattributes(x, {'struct', 'cell'}, {}));
-addOptional(p, 'noise_opts', default_noise_opts, @(x)validateattributes(x, {'struct'}, {}));
+addOptional(p, 'spindle_opts', default_spindle_opts, @(x) validateattributes(x, {'struct','double','cell'}, {}));
+addOptional(p, 'noise_opts', default_noise_opts, @(x) validateattributes(x, {'struct'}, {}));
 addOptional(p, 'plot_on', default_plot_on, @(x) validateattributes(x, {'logical'}, {'scalar'}));
 
 % Parse inputs
@@ -122,6 +123,7 @@ noise_opts = p.Results.noise_opts;
 plot_on = p.Results.plot_on;
 
 % Validate sampling frequency and total time
+assert(isstruct(spindle_opts) || isempty(spindle_opts),'spindle_opts must be a spindle option structure or empty');
 assert(Fs > 0, 'Sampling frequency must be positive.');
 assert(total_time > 0, 'Total time must be positive.');
 
