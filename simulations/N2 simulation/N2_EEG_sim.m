@@ -1,88 +1,126 @@
-function [signal, spindle_stats, slow_waves, spindles, slow, delta, noise] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts, plot_on)
-%N2_EEG_SIM Simulates N2 sleep stage EEG signals with spindle and K-complex events
+function [signal, spindle_stats, slow_waves, spindles, slow, delta, noise, artifacts] = N2_EEG_sim(varargin)
+%N2_EEG_SIM Simulates NREM Stage 2 sleep EEG with spindles
 %
-% [signal, spindle_stats] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts,  plot_on)
+%   Usage:
+%       [signal, spindle_stats, slow_waves, spindles, slow, delta, noise, artifacts] = N2_EEG_sim('ParameterName', ParameterValue, ...)
 %
-% Inputs:
-% - Fs: Sampling frequency in Hz
-% - total_time: Total time of the signal to be simulated in seconds
-% - baseline_time: Amount of the signal without peaks to act as a detection baseline
-% - spindle_opts: A array of spindle options structures (one for each spindle set) from N2_EEG_sim_spindle_opts()
-% - noise_opts: A spindle options structure from N2_EEG_sim_noise_opts()
-% - plot_on: Boolean flag to plot the generated signal or not (default: true)
+%   Input:
+%       'ParameterName', ParameterValue - Name-value pairs specifying options for simulating N2 EEG
+%           'Fs': Sampling frequency in Hz (default: 50)
+%           'total_time': Total time of the signal to be simulated in seconds (default: 3600)
+%           'baseline_time': Amount of the signal without peaks to act as a detection baseline (default: 30)
+%           'spindle_opts': An array of spindle options structures (one for each spindle set) from N2_EEG_sim_spindle_opts() (default: N2_EEG_sim_spindle_opts())
+%           'noise_opts': A noise options structure from N2_EEG_sim_noise_opts() (default: N2_EEG_sim_noise_opts())
+%           'plot_on': Boolean flag to plot the generated signal or not (default: true)
 %
-% Outputs:
-% - signal: Simulated N2 sleep stage EEG signal with spindle and K-complex events
-% - spindle_stats: An array of stats strutures with times, amplitudes, durations, and phases
+%   Output:
+%       signal: Simulated N2 sleep stage EEG signal with spindle and slow wave events
+%       spindle_stats: An array of stats structures with times, amplitudes, durations, and phases
+%       slow_waves: Slow wave component
+%       spindles: Spindle component
+%       slow: Slow oscillation component
+%       delta: Delta oscillation component
+%       noise: 1/f noise component
+%       artifacts: Motion artifact component
 %
-% Example usage:
-%       %Create 1 hour of data
-%       Fs = 100;
-%       total_time = 3600;
-%       baseline_time = 60; %Set first 1 minute to be baseline
-%
-%       %Create two kinds of spindles with different properties
-%       spindle_opts(1) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',15,'spindle_freq_std',.125,'phase_pref',0,'modulation_factor',.3);
-%       spindle_opts(2) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',13,'spindle_freq_std',.125,'phase_pref',pi/4,'modulation_factor',.4);
-%
-%       %Use default noise
-%       noise_opts = N2_EEG_sim_noise_opts;
-%
-%       %Generate the signal
-%       signal = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts);
+%   Example:
+%     % Run: N2_EEG_sim('demo') to execute the following demo code
+%       
+%     % Create 2 hours of data at 50Hz sampling rate
+%     Fs = 50;
+%     total_time = 3600*2;
+%     baseline_time = 60; % Set first 1 minute to be baseline
+% 
+%     % Create two different types of spindle classes
+%     % Define different history dependencies for each spindle set
+%     ctrl_pts1 = [ -3, 0, 3, 4.5, 8, 9, 12, 15, 18, 45, 50, 55, 65, 85];
+%     theta_spline1 = log([ 1e-5, 1e-2, 1, 2, 1, 1, 1, 1, 1, 1, 1.5, 1, 1, 1]);
+% 
+%     ctrl_pts2 = [ -3, 0, 4, 6, 8, 9, 12, 15, 18, 40, 45, 55, 65, 85];
+%     theta_spline2 = log([ 1e-5, 1e-2, 1, 3, 1, 1, 1, 1, 1, 1, 1.2, 1, 1, 1]);
+% 
+%     % Create the spindle options
+%     spindle_opts(1) = N2_EEG_sim_spindle_opts('spindle_freq_mean', 15, 'spindle_freq_std', 0.125, ...
+%         'phase_pref', 0, 'modulation_factor', 0.7, 'ctrl_pts', ctrl_pts1, 'theta_spline', theta_spline1);
+% 
+%     spindle_opts(2) = N2_EEG_sim_spindle_opts('spindle_freq_mean', 11, 'spindle_freq_std', 0.125, ...
+%         'phase_pref', pi/4, 'modulation_factor', 0.6, 'ctrl_pts', ctrl_pts2, 'theta_spline', theta_spline2);
+% 
+%     % Set noise level
+%     noise_opts = N2_EEG_sim_noise_opts('noise_factor', 5);
+% 
+%     % Generate simulation
+%     [signal, spindle_stats, slow_waves, spindles, slow, delta, noise, artifacts] = N2_EEG_sim('Fs', Fs, 'total_time', total_time, ...
+%         'baseline_time', baseline_time, 'spindle_opts', spindle_opts, 'noise_opts', noise_opts);
 %
 %    Copyright 2024 Prerau Laboratory. - http://www.sleepEEG.org
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %Create a sample to run as default
-if nargin == 0
-    %Create 2 hours of data
+if nargin == 1 & strcmpi(varargin{1},'demo')
+    %Create 2 hours of data at 50Hz sampling rate
     Fs = 50;
     total_time = 3600*2;
     baseline_time = 60; %Set first 1 minute to be baseline
 
-    %Create different history dependencies for each spindle set
+    %Create two different types of spindle classes
+    %Define different history dependencies for each spindle set
     ctrl_pts1 =         [    -3,     0, 3, 4.5, 8, 9, 12, 15, 18  45,  50, 55, 65, 85];
     theta_spline1 = log([  1e-5,  1e-2, 1, 2, 1, 1,  1,  1,  1,  1, 1.5, 1,  1,  1]);
 
     ctrl_pts2 =        [    -3,     0,  4, 6, 8, 9, 12, 15, 18  40,  45, 55, 65, 85];
     theta_spline2 = log([  1e-5,  1e-2, 1, 3, 1, 1,  1,  1,  1,  1, 1.2, 1,  1,  1]);
 
-
+    %Create the spindle options
     spindle_opts(1) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',15,'spindle_freq_std',.125,...
         'phase_pref',0,'modulation_factor',.7,'ctrl_pts',ctrl_pts1,'theta_spline',theta_spline1);
 
-    spindle_opts(2) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',10,'spindle_freq_std',.125,...
+    spindle_opts(2) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',11,'spindle_freq_std',.125,...
         'phase_pref',pi/4,'modulation_factor',.6,'ctrl_pts',ctrl_pts2,'theta_spline',theta_spline2);
 
-    noise_opts = N2_EEG_sim_noise_opts;
-
+    %Set noise level
+    noise_opts = N2_EEG_sim_noise_opts('noise_factor',5,'artifact_rate',20/3600);
+    
+    %Generate simulation
     [signal, spindle_stats, slow_waves, spindles, slow, delta, noise] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts);
 
     return;
 end
 
-%Force reasonable frequencies
-assert(Fs>0, 'Must have positive sampling frequency');
-assert(total_time>0, 'Must have positive total time');
+% Input parser setup
+p = inputParser;
 
-if nargin<3
-    baseline_time = 0;
-end
+% Default values
+default_Fs = 50;
+default_total_time = 3600;
+default_baseline_time = 30;
+default_spindle_opts = N2_EEG_sim_spindle_opts();
+default_noise_opts = N2_EEG_sim_noise_opts();
+default_plot_on = true;
 
-%Set phase pref and max prob
-if nargin<4 || isempty(spindle_opts)
-    spindle_opts = N2_EEG_sim_spindle_opts;
-end
+% Add parameters to parser
+addOptional(p, 'Fs', default_Fs, @(x) validateattributes(x, {'numeric'}, {'positive', 'scalar'}));
+addOptional(p, 'total_time', default_total_time, @(x) validateattributes(x, {'numeric'}, {'positive', 'scalar'}));
+addOptional(p, 'baseline_time', default_baseline_time, @(x) validateattributes(x, {'numeric'}, {'positive', 'scalar'}));
+addOptional(p, 'spindle_opts', default_spindle_opts, @(x) validateattributes(x, {'struct', 'cell'}, {}));
+addOptional(p, 'noise_opts', default_noise_opts, @(x) validateattributes(x, {'struct'}, {}));
+addOptional(p, 'plot_on', default_plot_on, @(x) validateattributes(x, {'logical'}, {'scalar'}));
 
-if nargin<5 || isempty(noise_opts)
-    noise_opts = N2_EEG_sim_noise_opts;
-end
+% Parse inputs
+parse(p, varargin{:});
 
-%Turn plot on/off
-if nargin<6
-    plot_on = true;
-end
+% Extract values from the parsed input
+Fs = p.Results.Fs;
+total_time = p.Results.total_time;
+baseline_time = p.Results.baseline_time;
+spindle_opts = p.Results.spindle_opts;
+noise_opts = p.Results.noise_opts;
+plot_on = p.Results.plot_on;
+
+% Validate sampling frequency and total time
+assert(Fs > 0, 'Sampling frequency must be positive.');
+assert(total_time > 0, 'Total time must be positive.');
 
 %Total number of time points
 N = total_time*Fs;
@@ -235,6 +273,28 @@ end
 
 %Add spindles to the signal
 signal = baseline_signal + sum(spindles,1);
+
+%Create motion artifacts
+artifacts = zeros(size(signal));
+if noise_opts.artifact_rate>0
+    %Generate Poisson events
+    artifacts = min(poissrnd(noise_opts.artifact_rate/Fs*ones(size(signal)), 1, N),1);
+    N_art = sum(artifacts);
+    
+    %Set the values of the events to be the amplitude
+    artifacts(artifacts>0) = randn(1,N_art)*noise_opts.artifact_amp_std + noise_opts.artifact_amp_mean;
+
+    %Use the sinc as the basis for the artifact shape
+    t_art=0:(1/Fs):10;
+    art = [-sinc(max(t_art)-t_art) sinc(t_art)*2];
+    art = art./max(art);
+
+    %Convolve the shape with the train to make the artifacts
+    artifacts = convn(artifacts,art,'same');
+end
+
+%Add the artifacts to the spindle
+signal = signal + artifacts;
 
 %Convert spindle inds into times
 %% Plot signal
