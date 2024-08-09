@@ -4,24 +4,22 @@ function noise_opts = N2_EEG_sim_noise_opts(varargin)
 %   Usage:
 %       noise_opts = N2_EEG_sim_noise_opts('ParameterName', ParameterValue, ...)
 %
-%   Input:
-%       'ParameterName', ParameterValue - Name-value pairs specifying options for simulating N2 EEG 1/f noise and motion artifacts.
-%           Valid parameter names and their default values are:
-%             'alpha_exp'          - Exponent for A/f^alpha noise. (default: 1.5)
-%             'noise_factor'       - Scaling factor for A/f^alpha noise. (default: 5)
-%             'artifact_rate'      - Rate of artifacts. (default: 0)
-%             'artifact_amp_mean'  - Mean amplitude of artifacts. (default: 600)
-%             'artifact_amp_std'   - Standard deviation of artifact amplitudes. (default: 60)
+%   Inputs (default values in parentheses):
+%       alpha_exp: double - Exponent for A/f^alpha noise. (Default: 1.5)
+%       noise_factor: double - Scaling factor for A/f^alpha noise. (Default: 5)
+%       artifact_rate: double - Rate of artifacts. (Default: 0)
+%       artifact_amp_mean: double - Mean amplitude of artifacts. (Default: 600)
+%       artifact_amp_std: double - Standard deviation of artifact amplitudes. (Default: 60)
 %
-%   Output:
-%       noise_opts - A structure containing options for simulating N2 EEG 1/f noise and motion artifacts.
+%   Outputs:
+%       noise_opts: structure - A structure containing options for simulating N2 EEG 1/f noise and motion artifacts.
 %
 %   Example:
 %       % Create options for simulating EEG noise with default parameters
 %       noise_opts = N2_EEG_sim_noise_opts();
 %
-%   Copyright 2024 Michael J. Prerau Laboratory. - http://www.sleepEEG.org
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%    Copyright 2024 Michael J. Prerau Laboratory. - http://www.sleepEEG.org
+% *********************************************************************
 
 parser = inputParser;
 parser.addParameter('alpha_exp', 1.5, @(x) validateattributes(x, {'numeric'}, {'nonnegative', 'real', 'scalar'}));

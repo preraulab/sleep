@@ -4,32 +4,30 @@ function spindle_opts = N2_EEG_sim_spindle_opts(varargin)
 %   Usage:
 %       spindle_opts = N2_EEG_sim_spindle_opts('ParameterName', ParameterValue, ...)
 %
-%   Input:
-%       'ParameterName', ParameterValue - Name-value pairs specifying options for simulating N2 EEG spindles.
-%           Valid parameter names and their default values are:
-%             'phase_pref'            - Preferred phase angle of the spindle, in radians. (default: 0)
-%             'spindle_freq_mean'     - Mean frequency of the spindle, in Hz. (default: 15)
-%             'spindle_freq_std'      - Standard deviation of the frequency, in Hz. (default: .125)
-%             'spindle_amp_mean'      - Mean amplitude of the spindle, in microvolts. (default: 8)
-%             'spindle_amp_std'       - Standard deviation of the amplitude, in microvolts. (default: 0.5)
-%             'spindle_dur_mean'      - Mean duration of the spindle, in seconds. (default: 1.5)
-%             'spindle_dur_std'       - Standard deviation of the duration, in seconds. (default: 0.25)
-%             'spindle_baseline_rate' - Baseline rate of spindles, in Hz. (default: 5/60)
-%             'modulation_factor'     - Modulation factor for cosine tuning. (default: 0.6)
-%             'ctrl_pts'              - Control points for spline. (default: -3:3:18)
-%             'spline_tmax'           - Maximum time for spline. (default: 15)
-%             'theta_spline'          - Theta values for spline. (default: [0, -5, 0, 0.5, 0, 0, 0, 0])
-%             'tension'               - Tension for spline. (default: 1)
+%   Inputs (default values in parentheses):
+%       phase_pref: double - Preferred phase angle of the spindle, in radians. (Default: 0)
+%       spindle_freq_mean: double - Mean frequency of the spindle, in Hz. (Default: 15)
+%       spindle_freq_std: double - Standard deviation of the frequency, in Hz. (Default: 0.125)
+%       spindle_amp_mean: double - Mean amplitude of the spindle, in microvolts. (Default: 8)
+%       spindle_amp_std: double - Standard deviation of the amplitude, in microvolts. (Default: 0.5)
+%       spindle_dur_mean: double - Mean duration of the spindle, in seconds. (Default: 1.5)
+%       spindle_dur_std: double - Standard deviation of the duration, in seconds. (Default: 0.25)
+%       spindle_baseline_rate: double - Baseline rate of spindles, in Hz. (Default: 5/60)
+%       modulation_factor: double - Modulation factor for cosine tuning. (Default: 0.6)
+%       ctrl_pts: numeric vector - Control points for spline. (Default: [-3, 0, 3, 5, 8, 9, 12, 15, 18, 45, 50, 55, 65, 85])
+%       spline_tmax: double - Maximum time for spline. (Default: 60)
+%       theta_spline: numeric vector - Theta values for spline. (Default: [0, -5, 0, 0.5, 0, 0, 0, 0])
+%       tension: double - Tension for spline. (Default: 1)
 %
-%   Output:
-%       spindle_opts - A structure containing options for simulating N2 EEG spindles.
+%   Outputs:
+%       spindle_opts: structure - A structure containing options for simulating N2 EEG spindles.
 %
 %   Example:
-%       spindle_opts = N2_EEG_sim_spindle_opts('spindle_freq_mean', 12, 'spindle_amp_mean', 5)
-%       This returns a structure containing options for simulating N2 EEG spindles with mean frequency 12 Hz and mean amplitude 5 microvolts.
+%       % Create options for simulating EEG spindles with specific parameters
+%       spindle_opts = N2_EEG_sim_spindle_opts('spindle_freq_mean', 12, 'spindle_amp_mean', 5);
 %
-%   Copyright 2024 Prerau Laboratory. - http://www.sleepEEG.org
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%    Copyright 2024 Prerau Laboratory. - http://www.sleepEEG.org
+% *********************************************************************
 
 % Set default values
 defaults.phase_pref = 0;
