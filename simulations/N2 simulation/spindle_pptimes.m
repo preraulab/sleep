@@ -44,7 +44,7 @@ function [spindle_times, spindle_train, S, t_spline] = spindle_pptimes(Fs, Fs_sp
 % Resample phase data if necessary
 if Fs ~= Fs_sp
     [d,n]=rat(Fs/Fs_sp);
-    phase=resample(x,n,d,500);
+    phase=resample(phase,n,d,500);
 end
 
 %Set default rate

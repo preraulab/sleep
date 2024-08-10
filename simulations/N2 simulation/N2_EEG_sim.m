@@ -26,36 +26,58 @@ function [signal, sim_features, components] = N2_EEG_sim(varargin)
 %               times: 1xT double - Times of artifacts in seconds
 %               amps: 1xT double - Amplitudes of artifact events
 %       components: MxT double - Matrix of signal components in the row order:
-%           slow_waves, slow, delta, noise, artifacts, spindles1,...,spindlesN,
-%           where M = 5 + number of spindle sets
+%           slow_waves, slow, delta, aperiodic_EEG, artifacts, line_noise1, ..., line_noiseN, spindles1,...,spindlesN,
+%           where M = 5 + number of line noise sets + number of spindle sets
 %
 %   Example:
 %     % Run: N2_EEG_sim('demo') to execute the following demo code
 %
-%     % Create 2 hours of data at 50Hz sampling rate
-%     Fs = 50;
+%     %------------------------------
+%     % Define simulation parameters
+%     %------------------------------
+%     %Create 2 hours of data at 120Hz sampling rate
+%     Fs = 200;
 %     total_time = 3600*2;
-%     baseline_time = 60; % Set first 1 minute to be baseline
+%     baseline_time = 60; %Set first 1 minute to be baseline
+%     
+%     %------------------------------
+%     % Define spindle parameters
+%     %------------------------------
+%     %Create two different types of spindle classes
+%     %Define different history dependencies for each spindle set
+%     ctrl_pts1 =         [    -3,     0, 3, 4.5, 8, 9, 12, 15, 18  45,  50, 55, 65, 85];
+%     theta_spline1 = log([  1e-5,  1e-2, 1, 2, 1, 1,  1,  1,  1,  1, 1.5, 1,  1,  1]);
+%     
+%     ctrl_pts2 =        [    -3,     0,  4, 6, 8, 9, 12, 15, 18  40,  45, 55, 65, 85];
+%     theta_spline2 = log([  1e-5,  1e-2, 1, 3, 1, 1,  1,  1,  1,  1, 1.2, 1,  1,  1]);
+%     
+%     %Create the spindle options
+%     spindle_opts(1) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',15,'spindle_freq_std',.125,...
+%         'phase_pref',0,'modulation_factor',.7,'ctrl_pts',ctrl_pts1,'theta_spline',theta_spline1);
+%     
+%     spindle_opts(2) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',11,'spindle_freq_std',.125,...
+%         'phase_pref',pi/4,'modulation_factor',.6,'ctrl_pts',ctrl_pts2,'theta_spline',theta_spline2);
+%     
+%     %------------------------------
+%     % Define noise parameters
+%     %------------------------------
+%     %Create motion artifacts at a rate of 10/hour
+%     artifact_rate = 10/3600;
+%     artifact_amp_mean = 600;
+%     artifact_amp_std = 50;
+%     
+%     %Create line noise
+%     %Create 60Hz line noise and a 18Hz sawtooth periodic noise
+%     line_noise_types = {'sin','sawtooth'};
+%     line_noise_freqs = [60, 18];
+%     line_noise_amps = [5, 5];
+%     
+%     noise_opts = N2_EEG_sim_noise_opts('artifact_rate',artifact_rate,'artifact_amp_mean',artifact_amp_mean,'artifact_amp_std',artifact_amp_std,...
+%         'line_noise_types',line_noise_types, 'line_noise_freqs', line_noise_freqs, 'line_noise_amps', line_noise_amps);
 %
-%     % Create two different types of spindle classes
-%     % Define different history dependencies for each spindle set
-%     ctrl_pts1 = [ -3, 0, 3, 4.5, 8, 9, 12, 15, 18, 45, 50, 55, 65, 85];
-%     theta_spline1 = log([ 1e-5, 1e-2, 1, 2, 1, 1, 1, 1, 1, 1, 1.5, 1, 1, 1]);
-%
-%     ctrl_pts2 = [ -3, 0, 4, 6, 8, 9, 12, 15, 18, 40, 45, 55, 65, 85];
-%     theta_spline2 = log([ 1e-5, 1e-2, 1, 3, 1, 1, 1, 1, 1, 1, 1.2, 1, 1, 1]);
-%
-%     % Create the spindle options
-%     spindle_opts(1) = N2_EEG_sim_spindle_opts('spindle_freq_mean', 15, 'spindle_freq_std', 0.125, ...
-%         'phase_pref', 0, 'modulation_factor', 0.7, 'ctrl_pts', ctrl_pts1, 'theta_spline', theta_spline1);
-%
-%     spindle_opts(2) = N2_EEG_sim_spindle_opts('spindle_freq_mean', 11, 'spindle_freq_std', 0.125, ...
-%         'phase_pref', pi/4, 'modulation_factor', 0.6, 'ctrl_pts', ctrl_pts2, 'theta_spline', theta_spline2);
-%
-%     %Set noise level and artifacts to occur at 20/hour
-%     noise_opts = N2_EEG_sim_noise_opts('noise_factor',5,'artifact_rate',10/3600);
-%
-%     % Generate simulation
+%     %------------------------------
+%     % Run simulation
+%     %------------------------------
 %     [signal, sim_features, components] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts);
 %
 %    Copyright 2024 Prerau Laboratory. - http://www.sleepEEG.org
@@ -63,11 +85,17 @@ function [signal, sim_features, components] = N2_EEG_sim(varargin)
 
 %Create a sample to run as default
 if nargin == 1 & strcmpi(varargin{1},'demo')
-    %Create 2 hours of data at 50Hz sampling rate
-    Fs = 50;
+    %-------------------------------------
+    % Define simulation parameters
+    %-------------------------------------
+    %Create 2 hours of data at 120Hz sampling rate
+    Fs = 200;
     total_time = 3600*2;
     baseline_time = 60; %Set first 1 minute to be baseline
 
+    %-------------------------------------
+    % Define spindle parameters
+    %-------------------------------------
     %Create two different types of spindle classes
     %Define different history dependencies for each spindle set
     ctrl_pts1 =         [    -3,     0, 3, 4.5, 8, 9, 12, 15, 18  45,  50, 55, 65, 85];
@@ -83,8 +111,22 @@ if nargin == 1 & strcmpi(varargin{1},'demo')
     spindle_opts(2) =  N2_EEG_sim_spindle_opts('spindle_freq_mean',11,'spindle_freq_std',.125,...
         'phase_pref',pi/4,'modulation_factor',.6,'ctrl_pts',ctrl_pts2,'theta_spline',theta_spline2);
 
-    %Set noise level
-    noise_opts = N2_EEG_sim_noise_opts('noise_factor',5,'artifact_rate',10/3600);
+    %-------------------------------------
+    % Define noise parameters
+    %-------------------------------------
+    %Create motion artifacts at a rate of 10/hour
+    artifact_rate = 10/3600;
+    artifact_amp_mean = 600;
+    artifact_amp_std = 50;
+
+    %Create line noise
+    %Create 60Hz line noise and a 18Hz sawtooth periodic noise
+    line_noise_types = {'sin','sawtooth'};
+    line_noise_freqs = [60, 18];
+    line_noise_amps = [5, 5];
+
+    noise_opts = N2_EEG_sim_noise_opts('artifact_rate',artifact_rate,'artifact_amp_mean',artifact_amp_mean,'artifact_amp_std',artifact_amp_std,...
+        'line_noise_types',line_noise_types, 'line_noise_freqs', line_noise_freqs, 'line_noise_amps', line_noise_amps);
 
     %Generate simulation
     [signal, sim_features.spindles, components] = N2_EEG_sim(Fs, total_time, baseline_time, spindle_opts, noise_opts);
@@ -96,7 +138,7 @@ end
 p = inputParser;
 
 % Default values
-default_Fs = 50;
+default_Fs = 128;
 default_total_time = 3600;
 default_baseline_time = 30;
 default_spindle_opts = N2_EEG_sim_spindle_opts();
@@ -196,9 +238,13 @@ delta = filtfilt(d,randn(1,N))*10;
 %% Generate colored noise
 %1/f^alpha
 
-cn = dsp.ColoredNoise('SamplesPerFrame', N, 'InverseFrequencyPower', noise_opts.alpha_exp);
-noise = cn()*noise_opts.noise_factor;
-noise = noise';
+if noise_opts.aperiodic.magnitude>0
+cn = dsp.ColoredNoise('SamplesPerFrame', N, 'InverseFrequencyPower', noise_opts.aperiodic.alpha);
+aperiodic_noise = cn()*noise_opts.aperiodic.magnitude;
+aperiodic_noise = aperiodic_noise';
+else
+    aperiodic_noise = zeros(1,N);
+end
 
 %% Compute SO
 
@@ -216,13 +262,11 @@ d = designfilt('bandpassiir', ...       % Response type
     'MatchExactly','passband', ...   % Design method options
     'SampleRate',Fs);
 %% Create baseline signal
-baseline_signal = double(slow_waves + slow + delta + noise);
+baseline_signal = double(slow_waves + slow + delta + aperiodic_noise);
 SO_EEG = filtfilt(d,baseline_signal);
 
 %Extract SO-phase
 SO_phase = angle(hilbert(SO_EEG));
-
-
 
 %% Generate spindles
 if isempty(spindle_opts)
@@ -246,7 +290,7 @@ else
         theta_spline = spindle_opts(ss).theta_spline;
         tension = spindle_opts(ss).tension;
 
-        Fs_sp = Fs;
+        Fs_sp = min(50,Fs);
 
         %Set spindle density
         [spindle_times, ~, S{ss}, t_spline{ss}] = ...
@@ -272,7 +316,7 @@ else
             end
         end
 
-        sim_features.spindles(ss).times = spindle_times; %#ok<*AGROW>
+        sim_features.spindles(ss).times = spindle_times; 
         sim_features.spindles(ss).freqs = spindle_freqs;
         sim_features.spindles(ss).amps = spindle_amps;
         sim_features.spindles(ss).durations = spindle_durations;
@@ -282,14 +326,18 @@ end
 
 %Create motion artifacts
 artifacts = zeros(1,N);
-if noise_opts.artifact_rate>0
+art_rate = noise_opts.artifacts.rate;
+art_amp_mean = noise_opts.artifacts.amp_mean;
+art_amp_std = noise_opts.artifacts.amp_std;
+
+if ~isempty(noise_opts.artifacts.rate)
     %Generate Poisson events
-    artifacts = min(poissrnd(noise_opts.artifact_rate/Fs*ones(1,N), 1, N),1);
+    artifacts = min(poissrnd(art_rate/Fs*ones(1,N), 1, N),1);
 
     %Generate artifact features
     N_art = sum(artifacts);
     artifact_times = t(artifacts==1);
-    artifact_amps = randn(1,N_art)*noise_opts.artifact_amp_std + noise_opts.artifact_amp_mean;
+    artifact_amps = randn(1,N_art)*art_amp_std + art_amp_mean;
 
     %Set the values of the events to be the amplitude
     artifacts(artifacts>0) = artifact_amps;
@@ -309,9 +357,41 @@ else
     sim_features.artifacts = [];
 end
 
+%Create line noise
+if ~isempty(noise_opts.line_noise.types)
+    N_ln = length(noise_opts.line_noise.types);
+    line_noise = zeros(N_ln,N);
+
+    %Number of line noise components
+    ln_types = noise_opts.line_noise.types;
+    ln_freqs = noise_opts.line_noise.freqs;
+    ln_amps = noise_opts.line_noise.amps;
+
+    for ii = 1:N_ln
+        switch ln_types{ii}
+            case 'sin'
+                ln_fun = @sin;
+            case 'sawtooth'
+                ln_fun = @sawtooth;
+            case 'square'
+                ln_fun = @square;
+            otherwise
+                error('Invalid line noise function type. Options are sin, square, and sawtooth');
+        end
+
+        %Check to see if frequency is below Nyquist
+        if ln_freqs(ii)<Fs/2
+            line_noise(ii,:) = ln_amps(ii)*ln_fun(2*pi*t*ln_freqs(ii));
+        else
+            warning(['Line noise at ' num2str(ln_freq) 'Hz not simulated, since it is above the Nyquist'])
+        end
+    end
+else
+   line_noise = zeros(1,N); 
+end
 
 %Create components and add to create signal
-components = [slow_waves; slow; delta; noise; artifacts; spindles];
+components = [slow_waves; slow; delta; aperiodic_noise; artifacts; line_noise; spindles];
 signal = sum(components,1);
 
 %Convert spindle inds into times
@@ -327,7 +407,7 @@ if plot_on
         0.6350    0.0780    0.1840];
 
     warning('off')
-    [spect, stimes, sfreqs] = multitaper_spectrogram_mex(signal, Fs, [.5 25], [2 3], [1 .05], 2^10,'constant','plot_on',false);
+    [spect, stimes, sfreqs] = multitaper_spectrogram_mex(signal, Fs, [.5 Fs/2], [2 3], [1 .05], 2^10,'constant','plot_on',false);
     warning('on')
     if ~isempty(spindle_opts)
         [t_sp, b, yhat, dylo, dyhi] = fit_ppsplines(t, SO_phase, sim_features.spindles, spindle_opts);
