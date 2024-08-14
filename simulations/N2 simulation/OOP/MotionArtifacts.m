@@ -37,6 +37,8 @@ classdef MotionArtifacts < handle
         Times double = []; % Generated artifact times
         Amps double = []; % Generated artifact amplitudes
         Signal double = []; % Stored simulated signal
+
+        isActive = true;
     end
 
     methods

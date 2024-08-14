@@ -31,6 +31,8 @@ classdef LineNoise < handle
         Freq double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 60 % Frequencies of line noise components
         Amp double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 5 % Amplitudes of line noise components
         Signal double = [] % Stored simulated line noise signal
+
+        isActive = true;
     end
 
     methods

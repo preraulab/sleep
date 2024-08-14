@@ -42,6 +42,8 @@ classdef SlowWaves < handle
         Amps = [] % Array of slow wave amplitudes
         Durations = [] % Array of slow wave durations
         Signal double = [] % Stored simulated slow wave signal
+
+        isActive = true;
     end
 
     methods

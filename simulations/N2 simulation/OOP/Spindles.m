@@ -42,7 +42,7 @@ classdef Spindles < handle
     properties
         Freq_mean double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 15
         Freq_sd double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 0.125
-        Amp_mean double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 8
+        Amp_mean double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 6
         Amp_sd double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 0.5
         Dur_mean double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 1.5
         Dur_sd double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 0.25
@@ -65,13 +65,15 @@ classdef Spindles < handle
         t_spline = [];
 
         Signal = [];
+
+        isActive = true;
     end
 
     methods
         function obj = Spindles(varargin)
             % Create an input parser object
             p = inputParser;
-            
+
             % Define the parameters and their default values
             addOptional(p, 'Freq_mean', obj.Freq_mean, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
             addOptional(p, 'Freq_sd', obj.Freq_sd, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
@@ -88,10 +90,10 @@ classdef Spindles < handle
             addOptional(p, 'Spline_tmax', obj.Spline_tmax, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
             addOptional(p, 'Tension', obj.Tension, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
             addOptional(p, 'Fs_sp', obj.Fs_sp, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
-            
+
             % Parse the inputs
             parse(p, varargin{:});
-            
+
             % Assign parsed values to object properties
             obj.Freq_mean = p.Results.Freq_mean;
             obj.Freq_sd = p.Results.Freq_sd;
@@ -126,31 +128,37 @@ classdef Spindles < handle
                 %Remove any spindles before detection start time
                 spindle_times = spindle_times(spindle_times>obj.Start_time);
 
-                durations = nan(1,length(spindle_times));
-                amps = nan(1,length(spindle_times));
-                freqs = nan(1,length(spindle_times));
+                N_spindles = length(spindle_times);
+                spindle_durations = max(obj.Dur_mean + randn(1,N_spindles)*obj.Dur_mean,0);
+                spindle_amps =  max(obj.Amp_mean + randn(1,N_spindles)*obj.Amp_sd, 0);
+                spindle_freqs = max(obj.Freq_mean + randn(1,N_spindles)*obj.Freq_sd,0);
+         
+                spindle_phase = wrapToPi(interp1(t,unwrap(SO_phase), spindle_times));
 
+                assert(length(spindle_durations)==N_spindles,'Error: Durations must be the same size as times');
+                assert(length(spindle_amps)==N_spindles,'Error: Amps must be the same size as times');
+                assert(length(spindle_freqs)==N_spindles,'Error: Freqs must be the same size as times');
+                assert(length(spindle_phase)==N_spindles,'Error: Phases must be the same size as times');
+                
                 %Generate spindle waveforms and place at each time
-                for ii = 1:length(spindle_times)
-                    durations(ii) = max(obj.Dur_mean + randn*obj.Dur_mean,0);
-                    amps(ii) = max(obj.Amp_mean + randn*obj.Amp_sd, 0);
-                    freqs(ii) = max(obj.Freq_mean + randn*obj.Freq_sd,0);
-
-                    sp_t = linspace(0,durations(ii),round(durations(ii)*Fs));
-                    spindle = sin(2*pi*sp_t*freqs(ii)) .* hanning(length(sp_t))'*amps(ii);
-                    sp_inds = round((sp_t+spindle_times(ii)-durations(ii)/2)*Fs);
+                for ii = 1:N_spindles
+                    sp_t = linspace(0,spindle_durations(ii),round(spindle_durations(ii)*Fs));
+                    spindle = sin(2*pi*sp_t*spindle_freqs(ii)) .* hanning(length(sp_t))'*spindle_amps(ii);
+                    sp_inds = round((sp_t+spindle_times(ii)-spindle_durations(ii)/2)*Fs);
 
                     if all(sp_inds>1 & sp_inds<N)
                         spindles(sp_inds) = spindle;
                     end
-                end
+                end 
 
                 obj.Times = spindle_times;
-                obj.Freqs = freqs;
-                obj.Amps = amps;
-                obj.Durations = durations;
-                obj.Phase = SO_phase(round(spindle_times*Fs));
+                obj.Freqs = spindle_freqs;
+                obj.Amps = spindle_amps;
+                obj.Durations = spindle_durations;
+                obj.Phase = spindle_phase;
                 obj.Signal = spindles;
+
+
             end
         end
     end

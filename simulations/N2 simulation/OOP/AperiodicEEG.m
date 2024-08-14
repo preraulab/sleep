@@ -30,6 +30,8 @@ classdef AperiodicEEG < handle
         Magnitude double {mustBePositive, mustBeReal, mustBeNonempty} = 5; % Scaling factor for 1/f^alpha noise
 
         Signal double = []; % Stored simulated noise signal
+        
+        isActive = true;
     end
 
     methods
