@@ -73,6 +73,35 @@ classdef Spindles < handle
 
     methods
         function obj = Spindles(varargin)
+            %SPINDLES Construct an instance of the Spindles class
+            %
+            %   This constructor initializes the Spindles object with specified or default
+            %   properties related to spindle generation. These properties include the frequency
+            %   and amplitude characteristics, duration, baseline rate, and more.
+            %
+            %   Inputs:
+            %       varargin: Name-value pairs for setting the class properties
+            %           - Freq_mean: Mean frequency of spindles (Hz)
+            %           - Freq_sd: Standard deviation of spindle frequency (Hz)
+            %           - Amp_mean: Mean amplitude of spindles (µV)
+            %           - Amp_sd: Standard deviation of spindle amplitude (µV)
+            %           - Amp_min: Minimum amplitude threshold (µV)
+            %           - Dur_mean: Mean duration of spindles (s)
+            %           - Dur_sd: Standard deviation of spindle duration (s)
+            %           - Dur_min: Minimum duration threshold (s)
+            %           - Baseline_rate: Baseline spindle occurrence rate (Hz)
+            %           - Start_time: Start time for spindle generation (s)
+            %           - Phase_pref: Preferred phase for spindle generation (radians)
+            %           - Modulation_factor: Modulation factor for spindle amplitude
+            %           - Ctrl_pts: Control points for spindle shape generation
+            %           - Theta_spline: Theta values for spline interpolation
+            %           - Spline_tmax: Maximum time for spline interpolation (s)
+            %           - Tension: Tension parameter for spline interpolation
+            %           - Fs_sp: Sampling frequency for spindle generation (Hz)
+            %
+            %   Outputs:
+            %       obj: Instance of the Spindles class with initialized properties.
+
             % Create an input parser object
             p = inputParser;
 
@@ -84,7 +113,7 @@ classdef Spindles < handle
             addOptional(p, 'Amp_min', obj.Amp_min, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
             addOptional(p, 'Dur_mean', obj.Dur_mean, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
             addOptional(p, 'Dur_sd', obj.Dur_sd, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
-              addOptional(p, 'Dur_min', obj.Dur_min, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
+            addOptional(p, 'Dur_min', obj.Dur_min, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
             addOptional(p, 'Baseline_rate', obj.Baseline_rate, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
             addOptional(p, 'Start_time', obj.Start_time, @(x) validateattributes(x, {'numeric'}, {'scalar', 'nonnegative'}));
             addOptional(p, 'Phase_pref', obj.Phase_pref, @(x) validateattributes(x, {'numeric'}, {'scalar'}));
@@ -119,6 +148,29 @@ classdef Spindles < handle
         end
 
         function spindles = sim(obj, t, SO_phase)
+            %SIM Simulate spindles based on specified properties and input signals
+            %
+            %   This method simulates spindle waveforms based on the properties of the Spindles
+            %   object, time vector, and SO (slow oscillation) phase. It uses a point process model
+            %   to determine spindle occurrence times and then generates spindle waveforms which
+            %   are modulated by the SO phase.
+            %
+            %   Inputs:
+            %       obj: Spindles object - instance of the Spindles class
+            %       t: 1xN vector - time vector (seconds)
+            %       SO_phase: 1xN vector - phase of slow oscillations (radians)
+            %
+            %   Outputs:
+            %       spindles: 1xN vector - simulated spindle signal
+            %
+            %   The method also updates the following properties of the Spindles object:
+            %       - Times: Vector of spindle onset times (seconds)
+            %       - Freqs: Vector of spindle frequencies (Hz)
+            %       - Amps: Vector of spindle amplitudes (µV)
+            %       - Durations: Vector of spindle durations (seconds)
+            %       - Phase: Vector of spindle phases at onset (radians)
+            %       - Signal: Simulated spindle signal (same as the output 'spindles')
+
             if ~isempty(obj.Freq_mean)
                 Fs = 1/(t(2)-t(1));
                 N = length(t);
@@ -129,7 +181,7 @@ classdef Spindles < handle
 
                 %Compute spindle times using point process model
                 [spindle_times, ~, obj.S, obj.t_spline] = ...
-                    obj.pptimes(Fs, obj.Fs_sp, obj.Baseline_rate, SO_phase, obj.Modulation_factor, obj.Phase_pref, obj.Ctrl_pts, obj.Theta_spline, obj.Tension, obj.Spline_tmax);
+                    obj.gen_ppspline_times(Fs, obj.Fs_sp, obj.Baseline_rate, SO_phase, obj.Modulation_factor, obj.Phase_pref, obj.Ctrl_pts, obj.Theta_spline, obj.Tension, obj.Spline_tmax);
 
                 %Remove any spindles before detection start time
                 spindle_times = spindle_times(spindle_times>obj.Start_time);
@@ -138,14 +190,14 @@ classdef Spindles < handle
                 spindle_durations = max(obj.Dur_mean + randn(1,N_spindles)*obj.Dur_sd, obj.Dur_min);
                 spindle_amps =  max(obj.Amp_mean + randn(1,N_spindles)*obj.Amp_sd, obj.Amp_min);
                 spindle_freqs = max(obj.Freq_mean + randn(1,N_spindles)*obj.Freq_sd,0);
-         
+
                 spindle_phase = wrapToPi(interp1(t,unwrap(SO_phase), spindle_times));
 
                 assert(length(spindle_durations)==N_spindles,'Error: Durations must be the same size as times');
                 assert(length(spindle_amps)==N_spindles,'Error: Amps must be the same size as times');
                 assert(length(spindle_freqs)==N_spindles,'Error: Freqs must be the same size as times');
                 assert(length(spindle_phase)==N_spindles,'Error: Phases must be the same size as times');
-                
+
                 %Generate spindle waveforms and place at each time
                 for ii = 1:N_spindles
                     sp_t = linspace(0,spindle_durations(ii),round(spindle_durations(ii)*Fs));
@@ -155,8 +207,9 @@ classdef Spindles < handle
                     if all(sp_inds>1 & sp_inds<N)
                         spindles(sp_inds) = spindle;
                     end
-                end 
+                end
 
+                %Add to object
                 obj.Times = spindle_times;
                 obj.Freqs = spindle_freqs;
                 obj.Amps = spindle_amps;
@@ -167,11 +220,41 @@ classdef Spindles < handle
 
             end
         end
+
+        function plot_spline(obj, varargin)
+            %PLOT_SPLINE Plot the spline function used for spindle generation
+            %
+            %   This method plots the spline function that was used to generate spindle
+            %   waveforms. The spline function is represented by its multipliers over time.
+            %   The plot is based on the spline data and theta values stored in the Spindles
+            %   object. Additional plot properties can be specified via name-value pairs.
+            %
+            %   Inputs:
+            %       obj: Spindles object - instance of the Spindles class
+            %       varargin: Name-value pairs for customizing the plot (e.g., line color, style)
+            %
+            %   Outputs:
+            %       None - This method generates a plot and does not return any output.
+            %
+            %   Example:
+            %       % Plot the spline function with default settings
+            %       obj.plot_spline();
+            %
+            %       % Plot the spline function with a red dashed line
+            %       obj.plot_spline('r--');
+
+            if ~isempty(obj.S)
+                plot(obj.t_spline, exp(obj.S' * obj.Theta_spline'), varargin{:})
+                xlabel('Time (s)')
+                ylabel('Multiplier')
+            end
+        end
+
     end
 
     methods (Static, Access = private)
-        function [times, train, S, t_spline] = pptimes(Fs, Fs_sp, baseline_rate, phase, coupling_mag, phase_pref, ctrl_pts, theta_spline, tension, spline_tmax)
-            %PPTIMES Generate spindle times and train using phase and spline parameters
+        function [times, train, S, t_spline] = gen_ppspline_times(Fs, Fs_sp, baseline_rate, phase, coupling_mag, phase_pref, ctrl_pts, theta_spline, tension, spline_tmax)
+            %GEN_PPSPLINE_TIMES Generate point process spindle times and train using phase and spline parameters
             %
             %   Usage:
             %       [times, train, S, t_spline] = pptimes(Fs, Fs_sp, baseline_rate, phase, coupling_mag, phase_pref, ctrl_pts, theta_spline, tension, spline_tmax)
@@ -206,7 +289,7 @@ classdef Spindles < handle
             %       theta_spline = [0, -5, 0, 0.5, 0, 0, 0, 0]; % Spline parameters
             %       tension = 1; % Tension parameter
             %       spline_tmax = 15; % Maximum time for spline fitting
-            %       [times, train, S, t_spline] = pptimes(Fs, Fs_sp, baseline_rate, phase, coupling_mag, phase_pref, ctrl_pts, theta_spline, tension, spline_tmax);
+            %       [times, train, S, t_spline] = gen_ppspline_times(Fs, Fs_sp, baseline_rate, phase, coupling_mag, phase_pref, ctrl_pts, theta_spline, tension, spline_tmax);
             %
             %   See also: poissrnd
             %

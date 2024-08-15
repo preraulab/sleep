@@ -1,8 +1,8 @@
 classdef SleepEEGSim < handle
     %SLEEPEEGSIM Simulate EEG data with multiple components including slow waves, spindles, and noise.
     %
-    %   simObj = SleepEEGSim(Fs); %Run for demo
-    %   simObj = SleepEEGSim('demo'); %Run for demo
+    %   simObj = SleepEEGSim('Fs', Fs); % Create a SleepEEGSim object with specified sampling frequency
+    %   simObj = SleepEEGSim('demo'); % Run the demo simulation
     %
     %   Inputs (default values in parentheses):
     %       Fs: Sampling frequency in Hz (Default: 128)
@@ -28,7 +28,7 @@ classdef SleepEEGSim < handle
     %           Usage:
     %               simObj = SleepEEGSim('demo');
     %           Description:
-    %               Initializes a SleepEEGSim object with demo data. Simulates 2 hours of EEG data
+    %               Initializes a SleepEEGSim object. If 'demo' is passed, simulates 2 hours of EEG data
     %               at 128 Hz sampling rate, including spindles, line noise, and artifacts.
     %               If no input arguments are provided, the default values are used.
     %
@@ -85,11 +85,9 @@ classdef SleepEEGSim < handle
     %               obj.plot();
     %           Description:
     %               Plots the simulated EEG signal, spectrogram, and additional components
-    %               such as spindles and phase histograms.
+    %               and spindle properties such model and fit phase and history properties.
     %
     %   Example:
-    %       %Run
-    %
     %       % Simulate 2 hours of EEG data at 128 Hz sampling rate.
     %       Fs = 128;
     %       T = 3600 * 2; % Duration of simulation in seconds
@@ -135,99 +133,131 @@ classdef SleepEEGSim < handle
     %    Copyright 2024 Michael J. Prerau Laboratory. - http://www.sleepEEG.org
     % *********************************************************************
 
-    properties
-        Fs = 128;
-        Aperiodic = [];
-        Slow_Waves = [];
-        BandSets = [];
-        SpindleSets = [];
-        LineNoiseSets = [];
-        Artifacts = [];
 
-        Signal = [];
-        t = [];
-        SO_EEG = [];
-        SO_phase = [];
+    properties
+        Fs = 128;  % Sampling frequency in Hz
+        Aperiodic = [];  % Aperiodic EEG noise component
+        Slow_Waves = [];  % Slow wave activity component
+        BandSets = [];  % Array of frequency band components
+        SpindleSets = [];  % Array of spindle components
+        LineNoiseSets = [];  % Array of line noise components
+        Artifacts = [];  % Motion artifacts component
+
+        Signal = [];  % Final simulated EEG signal
+        t = [];  % Time vector for the simulated signal
+        SO_EEG = [];  % Signal for slow oscillations
+        SO_phase = [];  % Phase of slow oscillations
     end
 
     methods
         function obj = SleepEEGSim(varargin)
-            if nargin==1 && strcmpi(varargin{1},'demo')
-                %Simulate 2 hours of data at 128Hz
-                Fs = 128;
-                T = 3600*2;
+            %SLEEP_EEG_SIM Constructor for the SleepEEGSim class
+            %
+            %   This constructor initializes the SleepEEGSim object. If 'demo' is passed
+            %   as an argument, it simulates 2 hours of EEG data at a sampling frequency
+            %   of 128Hz with predefined spindle parameters and various noise and artifact
+            %   components.
+            %
+            %   Inputs:
+            %       varargin: Optional arguments. If 'demo' is passed, a demo simulation is run.
+            %   Outputs:
+            %       obj: An instance of the SleepEEGSim class with the simulated data.
 
-                %Fast and slow spindle frequencies and phase preferences
-                freq_mean_fast = 14;
-                phase_pref_fast = 0;
+            if nargin == 1 && strcmpi(varargin{1}, 'demo')
+                % If 'demo' is specified, simulate a demo dataset
+                Fs = 128; % Sampling frequency in Hz
+                T = 3600*2; % Duration of simulation in seconds (2 hours)
 
-                freq_mean_slow = 11;
-                phase_pref_slow = -pi/3;
+                % Parameters for fast and slow spindles
+                freq_mean_fast = 14; % Mean frequency of fast spindles
+                phase_pref_fast = 0; % Phase preference for fast spindles
 
-                %Define different history dependencies for each spindle set
-                ctrl_pts_fast =         [    -3,     0, 3, 4.5, 8, 9, 12, 15, 18  45,  50, 55, 65, 85];
-                theta_spline_fast = log([  1e-5,  1e-2, 1, 2, 1, 1,  1,  1,  1,  1, 1.5, 1,  1,  1]);
+                freq_mean_slow = 11; % Mean frequency of slow spindles
+                phase_pref_slow = -pi/3; % Phase preference for slow spindles
 
-                ctrl_pts_slow =        [    -3,     0,  4, 6, 8, 9, 12, 15, 18  40,  45, 55, 65, 85];
-                theta_spline_slow = log([  1e-5,  1e-2, 1, 3, 1, 1,  1,  1,  1,  1, 1.2, 1,  1,  1]);
+                % Define control points and spline parameters for fast and slow spindles
+                ctrl_pts_fast = [ -3, 0, 3, 4.5, 8, 9, 12, 15, 18  45, 50, 55, 65, 85 ];
+                theta_spline_fast = log([ 1e-5, 1e-2, 1, 2, 1, 1, 1, 1, 1, 1, 1.5, 1, 1, 1 ]);
 
+                ctrl_pts_slow = [ -3, 0, 4, 6, 8, 9, 12, 15, 18  40, 45, 55, 65, 85 ];
+                theta_spline_slow = log([ 1e-5, 1e-2, 1, 3, 1, 1, 1, 1, 1, 1, 1.2, 1, 1, 1 ]);
+
+                % Create Spindles objects for fast and slow spindles
                 fast_spindles = Spindles('Freq_mean', freq_mean_fast, 'Phase_pref', phase_pref_fast, 'Ctrl_pts', ctrl_pts_fast, 'Theta_spline', theta_spline_fast);
                 slow_spindles = Spindles('Freq_mean', freq_mean_slow, 'Phase_pref', phase_pref_slow, 'Ctrl_pts', ctrl_pts_slow, 'Theta_spline', theta_spline_slow);
 
-                % %Create slow and delta power
-                % slow_power = BandEEG([1. 1.5], 10);
-                % delta_power = BandEEG([1 5], 15);
+                % Create an instance of SleepEEGSim
+                simObj = SleepEEGSim('Fs', Fs);
 
-                simObj = SleepEEGSim('Fs',Fs);
-
+                % Add components to the simulation
                 simObj.addAperiodic;
                 simObj.addSlowWaves;
                 simObj.addSpindles(fast_spindles);
                 simObj.addSpindles(slow_spindles);
-                simObj.addLineNoise(LineNoise('sin',60,15));
-                simObj.addLineNoise(LineNoise('sawtooth',18,10));
+                simObj.addLineNoise(LineNoise('sin', 60, 15));
+                simObj.addLineNoise(LineNoise('sawtooth', 18, 10));
                 simObj.addArtifacts;
 
-                %Simulate the data
+                % Run the simulation and plot results
                 simObj.sim(T);
-                %Plot the results
                 simObj.plot;
 
-                obj = simObj;
+                obj = simObj; % Return the simulated object
                 return;
             else
+                % If not 'demo', initialize with user-defined or default parameters
+                p = inputParser; % Create an input parser object
 
-                % Create an input parser object
-                p = inputParser;
-
-                % Define the parameters and their default values
+                % Define the parameter and its default value
                 addOptional(p, 'Fs', obj.Fs, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
 
-                % Parse the inputs
+                % Parse the input arguments
                 parse(p, varargin{:});
 
-                % Assign parsed values to object propertiesobj.Total_time =
+                % Assign parsed values to the object's properties
                 obj.Fs = p.Results.Fs;
-
             end
         end
 
-        function obj = addAperiodic(obj,ap)
-            if nargin==1
-                ap = AperiodicEEG;
+        function obj = addAperiodic(obj, ap)
+            %ADDAPERIODIC Add an aperiodic EEG component to the simulation
+            %
+            %   This method adds an AperiodicEEG object to the simulation. If no object is
+            %   provided, a default AperiodicEEG object is created.
+            %
+            %   Inputs:
+            %       ap: Optional AperiodicEEG object. If not provided, a default object is used.
+            %   Outputs:
+            %       obj: Updated SleepEEGSim object with the aperiodic component added.
+
+            if nargin == 1
+                ap = AperiodicEEG; % Create default AperiodicEEG object
             end
 
-            assert(isa(ap,'AperiodicEEG'),'Must be an object of class AperiodicEEG');
-            obj.Aperiodic = ap;
+            % Check if ap is an instance of AperiodicEEG
+            assert(isa(ap, 'AperiodicEEG'), 'Must be an object of class AperiodicEEG');
+            obj.Aperiodic = ap; % Assign the aperiodic component to the object
         end
 
-        function obj = addLineNoise(obj,ln)
-            if nargin==1
-                ln = LineNoise;
+        function obj = addLineNoise(obj, ln)
+            %ADDLINENOISE Add line noise components to the simulation
+            %
+            %   This method adds a LineNoise object to the simulation. If no object is
+            %   provided, a default LineNoise object is created.
+            %
+            %   Inputs:
+            %       ln: Optional LineNoise object. If not provided, a default object is used.
+            %   Outputs:
+            %       obj: Updated SleepEEGSim object with the line noise component added.
+
+            if nargin == 1
+                ln = LineNoise; % Create default LineNoise object
             end
 
-            assert(isa(ln,'LineNoise'),'Must be an object of class LineNoise');
+            % Check if ln is an instance of LineNoise
+            assert(isa(ln, 'LineNoise'), 'Must be an object of class LineNoise');
 
+            % Add the line noise object to the list of line noise components
             if isempty(obj.LineNoiseSets)
                 obj.LineNoiseSets = ln;
             else
@@ -235,13 +265,25 @@ classdef SleepEEGSim < handle
             end
         end
 
-        function obj = addSpindles(obj,ss)
-            if nargin==1
-                ss = Spindles;
+        function obj = addSpindles(obj, ss)
+            %ADDSPINDLES Add spindle components to the simulation
+            %
+            %   This method adds a Spindles object to the simulation. If no object is
+            %   provided, a default Spindles object is created.
+            %
+            %   Inputs:
+            %       ss: Optional Spindles object. If not provided, a default object is used.
+            %   Outputs:
+            %       obj: Updated SleepEEGSim object with the spindle component added.
+
+            if nargin == 1
+                ss = Spindles; % Create default Spindles object
             end
 
-            assert(isa(ss,'Spindles'),'Must be an object of class Spindles');
+            % Check if ss is an instance of Spindles
+            assert(isa(ss, 'Spindles'), 'Must be an object of class Spindles');
 
+            % Add the spindle object to the list of spindle components
             if isempty(obj.SpindleSets)
                 obj.SpindleSets = ss;
             else
@@ -249,13 +291,25 @@ classdef SleepEEGSim < handle
             end
         end
 
-        function obj = addBand(obj,bb)
-            if nargin==1
-                bb = BandEEG;
+        function obj = addBand(obj, bb)
+            %ADDBAND Add band-specific EEG components to the simulation
+            %
+            %   This method adds a BandEEG object to the simulation. If no object is
+            %   provided, a default BandEEG object is created.
+            %
+            %   Inputs:
+            %       bb: Optional BandEEG object. If not provided, a default object is used.
+            %   Outputs:
+            %       obj: Updated SleepEEGSim object with the band-specific component added.
+
+            if nargin == 1
+                bb = BandEEG; % Create default BandEEG object
             end
 
-            assert(isa(bb,'BandEEG'),'Must be an object of class BandEEG');
+            % Check if bb is an instance of BandEEG
+            assert(isa(bb, 'BandEEG'), 'Must be an object of class BandEEG');
 
+            % Add the band EEG object to the list of band-specific components
             if isempty(obj.BandSets)
                 obj.BandSets = bb;
             else
@@ -263,25 +317,81 @@ classdef SleepEEGSim < handle
             end
         end
 
-        function obj = addArtifacts(obj,arts)
-            if nargin==1
-                arts = MotionArtifacts;
+        function obj = addArtifacts(obj, arts)
+            %ADDARTIFACTS Add motion artifacts to the simulation
+            %
+            %   This method adds a MotionArtifacts object to the simulation. If no object is
+            %   provided, a default MotionArtifacts object is created.
+            %
+            %   Inputs:
+            %       arts: Optional MotionArtifacts object. If not provided, a default object is used.
+            %   Outputs:
+            %       obj: Updated SleepEEGSim object with the artifacts component added.
+
+            if nargin == 1
+                arts = MotionArtifacts; % Create default MotionArtifacts object
             end
 
-            assert(isa(arts,'MotionArtifacts'),'Must be an object of class MotionArtifacts');
-            obj.Artifacts = arts;
+            % Check if arts is an instance of MotionArtifacts
+            assert(isa(arts, 'MotionArtifacts'), 'Must be an object of class MotionArtifacts');
+            obj.Artifacts = arts; % Assign the artifacts component to the object
         end
 
-        function obj = addSlowWaves(obj,sws)
-            if nargin==1
-                sws = SlowWaves;
+        function obj = addSlowWaves(obj, sws)
+            %ADDSLOWWAVES Add slow waves component to the simulation
+            %
+            %   This method adds a SlowWaves object to the simulation. If no object is
+            %   provided, a default SlowWaves object is created.
+            %
+            %   Inputs:
+            %       sws: Optional SlowWaves object. If not provided, a default object is used.
+            %   Outputs:
+            %       obj: Updated SleepEEGSim object with the slow waves component added.
+
+            if nargin == 1
+                sws = SlowWaves; % Create default SlowWaves object
             end
 
-            assert(isa(sws,'SlowWaves'),'Must be an object of class SlowWaves');
-            obj.Slow_Waves = sws;
+            % Check if sws is an instance of SlowWaves
+            assert(isa(sws, 'SlowWaves'), 'Must be an object of class SlowWaves');
+            obj.Slow_Waves = sws; % Assign the slow waves component to the object
         end
 
-        function obj = sim(obj,T)
+        function obj = sim(obj, T)
+            %SIM Simulate EEG data based on the configured components
+            %
+            %   This method generates simulated EEG data based on the properties and
+            %   components added to the SleepEEGSim object. It combines contributions
+            %   from aperiodic signals, spindles, slow waves, line noise, and artifacts
+            %   into a single data array. The data is generated for the specified duration
+            %   T and is sampled at the object's sampling frequency.
+            %
+            %   Inputs:
+            %       T: double - Duration of the simulation in seconds. The length of
+            %       the output data will be T seconds.
+            %
+            %   Outputs:
+            %       data: array - Simulated EEG data. A vector of length equal to
+            %       the sampling frequency (Fs) multiplied by the duration (T).
+            %       t: array - Time vector corresponding to the data array. A vector
+            %       of length equal to the data vector.
+            %
+            %   Example:
+            %       % Simulate EEG data for 2 hours
+            %       T = 3600 * 2; % 2 hours in seconds
+            %       [data, t] = sim(simObj, T);
+            %       % Plot the first 10 seconds of the simulated data
+            %       plot(t(1:1280), data(1:1280));
+            %       xlabel('Time (s)');
+            %       ylabel('EEG Data');
+            %
+            %   Notes:
+            %       - The function generates data at the object's sampling frequency
+            %       (Fs) and the length of the output data will be T seconds.
+            %       - The output data includes contributions from all added components.
+            %       - The time vector t is generated based on the sampling frequency
+            %       and the duration of the simulation.
+            %
             if nargin == 1
                 T = 3600;
             end
@@ -329,6 +439,18 @@ classdef SleepEEGSim < handle
         end
 
         function obj = deactivateAll(obj)
+            %DEACTIVATEALL Deactivate all components of the SleepEEGSim object
+            %
+            %   This method deactivates all components of the SleepEEGSim object by setting
+            %   their 'isActive' property to false. This includes Aperiodic, Slow_Waves,
+            %   Artifacts, BandSets, SpindleSets, and LineNoiseSets.
+            %
+            %   Inputs:
+            %       obj: SleepEEGSim object - instance of the SleepEEGSim class
+            %
+            %   Outputs:
+            %       obj: Updated SleepEEGSim object with all components deactivated.
+
             obj.Aperiodic.isActive = false;
             obj.Slow_Waves.isActive = false;
             obj.Artifacts.isActive = false;
@@ -347,6 +469,19 @@ classdef SleepEEGSim < handle
         end
 
         function obj = activateAll(obj)
+            %ACTIVATEALL Activate all components of the SleepEEGSim object
+            %
+            %   This method activates all components of the SleepEEGSim object by setting
+            %   their 'isActive' property to true. This includes Aperiodic, Slow_Waves,
+            %   Artifacts, BandSets, SpindleSets, and LineNoiseSets.
+            %
+            %   Inputs:
+            %       obj: SleepEEGSim object - instance of the SleepEEGSim class
+            %
+            %   Outputs:
+            %       obj: Updated SleepEEGSim object with all components activated.
+
+
             obj.Aperiodic.isActive = true;
             obj.Slow_Waves.isActive = true;
             obj.Artifacts.isActive = true;
@@ -365,6 +500,20 @@ classdef SleepEEGSim < handle
         end
 
         function obj = genSignal(obj)
+            %GENSIGNAL Generate the composite signal based on active components
+            %
+            %   This method generates a composite signal by summing the signals from all
+            %   active components of the SleepEEGSim object. Components are considered active
+            %   based on their 'isActive' property. If no components are active, the signal
+            %   will be zero.
+            %
+            %   Inputs:
+            %       obj: SleepEEGSim object - instance of the SleepEEGSim class
+            %
+            %   Outputs:
+            %       obj: Updated SleepEEGSim object with the generated signal stored in the 'Signal' property.
+
+
             if isempty(obj.t)
                 error('Simulation must be run first');
             end
@@ -373,7 +522,6 @@ classdef SleepEEGSim < handle
             if obj.Aperiodic.isActive
                 signal = signal + obj.Aperiodic.Signal;
             end
-
 
             if obj.Slow_Waves.isActive
                 signal = signal + obj.Slow_Waves.Signal;
@@ -395,7 +543,6 @@ classdef SleepEEGSim < handle
                 end
             end
 
-
             for ii = 1:length(obj.LineNoiseSets)
                 if obj.LineNoiseSets(ii).isActive
                     signal = signal + obj.LineNoiseSets(ii).Signal;
@@ -406,17 +553,57 @@ classdef SleepEEGSim < handle
         end
 
         function plot_spect(obj)
-            obj.genSignal;
-            [spect, ~, sfreqs] =multitaper_spectrogram_mex(obj.Signal, obj.Fs,[.5 obj.Fs/2],[15 29],[30 5],'plot_on',false);
+            %PLOT_SPECT Plot the spectrogram of the generated signal
+            %
+            %   This method generates the signal using the genSignal method and then
+            %   computes and plots its spectrogram using the multitaper_spectrogram_mex function.
+            %   The plot displays the mean power spectral density in decibels.
+            %
+            %   Inputs:
+            %       obj: SleepEEGSim object - instance of the SleepEEGSim class
+            %
+            %   Outputs:
+            %       None. This method generates a plot of the spectrogram.
+            %
+            %   Example:
+            %       % Create an instance of SleepEEGSim and generate the signal
+            %       eeg_sim = SleepEEGSim();
+            %       % Plot the spectrogram
+            %       eeg_sim.plot_spect();
 
-            plot(sfreqs,pow2db(mean(spect,2)))
+
+            obj.genSignal;
+            [spect, ~, sfreqs] = multitaper_spectrogram_mex(obj.Signal, obj.Fs, [.5 obj.Fs/2], [15 29], [30 5], 'plot_on', false);
+
+            plot(sfreqs, pow2db(mean(spect, 2)));
         end
 
         function plot(obj)
+            %PLOT Generate plots for the simulated EEG signal and its components
+            %
+            %   This method generates several plots related to the simulated EEG signal.
+            %   If the signal has not been generated yet, it will first call the simulation
+            %   function. The plots include the spectrogram of the signal, the simulated
+            %   signal itself, individual spindle components, slow waves, and phase information.
+            %   Additionally, it plots the modulation history and phase histogram of spindles if
+            %   spindle data is present.
+            %
+            %   Inputs:
+            %       obj: SleepEEGSim object - instance of the SleepEEGSim class
+            %
+            %   Outputs:
+            %       None. This method generates and displays multiple plots, including:
+            %       - Spectrogram of the simulated EEG signal
+            %       - Time series of the simulated EEG signal
+            %       - Individual spindle components
+            %       - Slow waves and phase information
+            %       - Modulation history curve and phase histogram of spindles (if spindle data are present)
+
             if isempty(obj.Signal)
                 obj.sim;
             end
 
+            %Set consistent plot colors for each spindle set
             plot_colors = ...
                 [     0    0.4470    0.7410;
                 0.8500    0.3250    0.0980;
@@ -426,9 +613,12 @@ classdef SleepEEGSim < handle
                 0.3010    0.7450    0.9330;
                 0.6350    0.0780    0.1840];
 
+            %Compute MTS
             warning('off')
             [spect, stimes, sfreqs] = multitaper_spectrogram_mex(obj.Signal, obj.Fs, [.5 obj.Fs/2], [2 3], [1 .05], 2^10,'constant','plot_on',false,'verbose',false);
             warning('on')
+
+            %Estimate history for each spindle set
             if ~isempty(obj.SpindleSets)
                 [t_sp, b, yhat, dylo, dyhi] = obj.fit_ppsplines(obj.t, obj.SO_phase, obj.SpindleSets);
             end
@@ -468,7 +658,7 @@ classdef SleepEEGSim < handle
             linkaxes(ax_split,'x')
             linkaxes(ax_split([2,3]),'y')
 
-            %Plot Signal
+            %Plot filtered EEG signal
             axes(ax_split(2))
             plot(obj.t,obj.visfilt_EEG,'k')
 
@@ -478,7 +668,7 @@ classdef SleepEEGSim < handle
             pt = prctile(abs(obj.visfilt_EEG),99)+10;
             ylim(ax_split(2),[-pt pt])
 
-
+            %Plot spindle components
             axes(ax_split(3))
             hold all
             for ii = 1:length(obj.SpindleSets)
@@ -510,8 +700,7 @@ classdef SleepEEGSim < handle
             xlabel('Time (s)')
             set(gca,'fontsize',15);
 
-
-
+            %Plot the history modulation curves
             if ~isempty(obj.SpindleSets)
                 hist_ax = axes('Position',[  0.7552    0.1290    0.2346    0.3415]);
                 hold on
@@ -521,6 +710,10 @@ classdef SleepEEGSim < handle
                     c = exp(b{ss}(1));
                     fill([t_sp{ss}, fliplr(t_sp{ss})], [yhat{ss} / c - dylo{ss} / c; flipud(yhat{ss} / c + dyhi{ss} / c)],  plot_colors(ss,:), 'FaceAlpha', 0.2, 'EdgeColor', 'none');
                     plot(t_sp{ss}, yhat{ss} / c,  'color', plot_colors(ss,:), 'linewidth', 2);
+
+                    %Plot true curve dashed
+                    obj.SpindleSets(ss).plot_spline('linewidth',1,'linestyle','--','color', plot_colors(ss,:));
+
                     axis tight;
                     xlabel('Lag (s)');
                     ylabel('Modulation');
@@ -569,8 +762,11 @@ classdef SleepEEGSim < handle
                 end
                 title(['Theta: ' num2str(theta_mod)])
             end
+
+            %Add scrollbars and adjust axes
             axes(ax_split(1))
             xlim([min(obj.t) max(obj.t)])
+
             [zslider, pslider, zedit, pedit] = scrollzoompan(ax_split(1));
             mid = mean(xlim);
             xlim(ax_split(1), mid + [-15 15]);
@@ -583,51 +779,112 @@ classdef SleepEEGSim < handle
 
     methods (Access = protected)
         function [SO_phase, SO_EEG] = computeSOPhase(obj, baseline_signal)
-            %% Compute SO
+            %COMPUTESOPHASE Compute the Slow Oscillation (SO) phase and signal
+            %
+            %   This method computes the Slow Oscillation (SO) phase and SO-filtered
+            %   EEG signal from a given baseline signal. It applies a bandpass filter
+            %   to isolate the SO frequency range and then extracts the phase using
+            %   the Hilbert transform.
+            %
+            %   Inputs:
+            %       baseline_signal: Vector - the signal from which SO phase and signal
+            %           will be computed.
+            %
+            %   Outputs:
+            %       SO_phase: Vector - the phase of the Slow Oscillation component.
+            %       SO_EEG: Vector - the SO-filtered EEG signal.
+            %
+            %   Example:
+            %       [SO_phase, SO_EEG] = obj.computeSOPhase(baseline_signal);
+            %
+            %   Note:
+            %       The method uses a bandpass filter with a frequency range of 0.3 to
+            %       1.5 Hz to isolate the SO component.
 
-            %Compute SO band filter
+            % Compute SO band filter
             SO_freqrange = [.3 1.5];
             d = designfilt('bandpassiir', ...       % Response type
-                'StopbandFrequency1',SO_freqrange(1)-0.1, ...    % Frequency constraints
-                'PassbandFrequency1',SO_freqrange(1), ...
-                'PassbandFrequency2',SO_freqrange(2), ...
-                'StopbandFrequency2',SO_freqrange(2)+0.1, ...
-                'StopbandAttenuation1',60, ...   % Magnitude constraints
-                'PassbandRipple',1, ...
-                'StopbandAttenuation2',60, ...
-                'DesignMethod','ellip', ...      % Design method
-                'MatchExactly','passband', ...   % Design method options
-                'SampleRate',obj.Fs);
+                'StopbandFrequency1', SO_freqrange(1) - 0.1, ...    % Frequency constraints
+                'PassbandFrequency1', SO_freqrange(1), ...
+                'PassbandFrequency2', SO_freqrange(2), ...
+                'StopbandFrequency2', SO_freqrange(2) + 0.1, ...
+                'StopbandAttenuation1', 60, ...   % Magnitude constraints
+                'PassbandRipple', 1, ...
+                'StopbandAttenuation2', 60, ...
+                'DesignMethod', 'ellip', ...      % Design method
+                'MatchExactly', 'passband', ...   % Design method options
+                'SampleRate', obj.Fs);
             %% Create baseline signal
-            SO_EEG = filtfilt(d,baseline_signal);
-            %Extract SO-phase
+            SO_EEG = filtfilt(d, baseline_signal);
+            % Extract SO-phase
             SO_phase = angle(hilbert(SO_EEG));
         end
 
         function vfilt_sig = visfilt_EEG(obj)
-            %% Compute SO
+            %VISFILT_EEG Apply visual filter to the EEG signal
+            %
+            %   This method applies a bandpass filter to the EEG signal to isolate
+            %   the frequency range from 0.3 to 35 Hz. The filtered signal can be used
+            %   for visualization or further analysis.
+            %
+            %   Inputs:
+            %       obj: SleepEEGSim object - instance of the SleepEEGSim class
+            %
+            %   Outputs:
+            %       vfilt_sig: Vector - the EEG signal after bandpass filtering.
+            %
+            %   Example:
+            %       vfilt_sig = obj.visfilt_EEG();
+            %
+            %   Note:
+            %       The method uses a bandpass filter with a frequency range of 0.3 to
+            %       35 Hz for visualizing the EEG signal.
 
-            %Compute SO band filter
+            % Compute SO band filter
             SO_freqrange = [.3 35];
             d = designfilt('bandpassiir', ...       % Response type
-                'StopbandFrequency1',SO_freqrange(1)-0.1, ...    % Frequency constraints
-                'PassbandFrequency1',SO_freqrange(1), ...
-                'PassbandFrequency2',SO_freqrange(2), ...
-                'StopbandFrequency2',SO_freqrange(2)+1, ...
-                'StopbandAttenuation1',60, ...   % Magnitude constraints
-                'PassbandRipple',1, ...
-                'StopbandAttenuation2',60, ...
-                'DesignMethod','ellip', ...      % Design method
-                'MatchExactly','passband', ...   % Design method options
-                'SampleRate',obj.Fs);
+                'StopbandFrequency1', SO_freqrange(1) - 0.1, ...    % Frequency constraints
+                'PassbandFrequency1', SO_freqrange(1), ...
+                'PassbandFrequency2', SO_freqrange(2), ...
+                'StopbandFrequency2', SO_freqrange(2) + 1, ...
+                'StopbandAttenuation1', 60, ...   % Magnitude constraints
+                'PassbandRipple', 1, ...
+                'StopbandAttenuation2', 60, ...
+                'DesignMethod', 'ellip', ...      % Design method
+                'MatchExactly', 'passband', ...   % Design method options
+                'SampleRate', obj.Fs);
             %% Create baseline signal
-            vfilt_sig = filtfilt(d,obj.Signal);
+            vfilt_sig = filtfilt(d, obj.Signal);
         end
     end
 
     methods (Static)
-        %Helper function to fit the splines using a point process model
         function [t_sp, b, yhat, dylo, dyhi] = fit_ppsplines(t, SO_phase, spindle_sets)
+            %FIT_PPSPLINES Fit splines using a point process model for spindles
+            %
+            %   This method fits splines to the phase of Slow Oscillation (SO) using
+            %   a point process model for spindle data. The splines are constructed
+            %   using control points and tension parameters to model spindle modulations.
+            %
+            %   Inputs:
+            %       t: Vector - time points for the analysis.
+            %       SO_phase: Vector - phase of the Slow Oscillation at the time points.
+            %       spindle_sets: Array of SpindleSets objects - each containing spindle
+            %           times, phases, control points, and tension parameters.
+            %
+            %   Outputs:
+            %       t_sp: Cell array - time points for each spindle set used for spline fitting.
+            %       b: Cell array - regression coefficients for each spindle set.
+            %       yhat: Cell array - predicted values from the spline fit for each spindle set.
+            %       dylo: Cell array - lower confidence bounds for the predicted values.
+            %       dyhi: Cell array - upper confidence bounds for the predicted values.
+            %
+            %   Example:
+            %       [t_sp, b, yhat, dylo, dyhi] = fit_ppsplines(t, SO_phase, spindle_sets);
+            %
+            %   Note:
+            %       The method constructs splines using cubic spline interpolation and
+            %       fits a Poisson regression model to the spindles' occurrences.
             %Construct spline within .25s bins
             dt = .25;
             t_train = t(1):dt:t(end);

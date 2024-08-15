@@ -5,8 +5,8 @@ classdef AperiodicEEG < handle
     %       opts = AperiodicEEG('PropertyName', PropertyValue, ...)
     %
     %   Properties (default values in parentheses):
-    %       Alpha: double - Exponent for 1/f^alpha noise (Default: 1.8)
-    %       Magnitude: double - Scaling factor for 1/f^alpha noise (Default: 6)
+    %       Alpha: double - Exponent for mag/f^alpha noise (Default: 1.8)
+    %       Magnitude: double - Scaling factor for mag/f^alpha noise (Default: 6)
     %       Signal: double array - Stored simulated noise signal (empty if no simulation is performed)
     %
     %   Methods:
@@ -30,22 +30,45 @@ classdef AperiodicEEG < handle
         Magnitude double {mustBePositive, mustBeReal, mustBeNonempty} = 6; % Scaling factor for 1/f^alpha noise
 
         Signal double = []; % Stored simulated noise signal
-        
+
         isActive = true;
     end
 
     methods
         function obj = AperiodicEEG(varargin)
+            %APERIODICEEG Construct an instance of this class with specified properties for modeling colored noise.
+            %
+            %   This constructor creates an instance of the AperiodicEEG class, which models
+            %   colored noise using the formula A/f^alpha. Default values for properties are
+            %   used if not specified.
+            %
+            %   Usage:
+            %       obj = AperiodicEEG('PropertyName', PropertyValue, ...)
+            %
+            %   Inputs (default values in parentheses):
+            %       Alpha: double - Exponent for A/f^alpha noise (Default: 1.8)
+            %       Magnitude: double - Scaling factor for A/f^alpha noise (Default: 6)
+            %
+            %   Outputs:
+            %       obj: AperiodicEEG object - instance of the AperiodicEEG class with specified properties
+            %
+            %   Example:
+            %       % Create an instance of AperiodicEEG with specific parameters
+            %       aeeg = AperiodicEEG('Alpha', 1.8, 'Magnitude', 6);
+            %
+            %   See also: sim
+
+
             % Create an input parser object
             p = inputParser;
-            
+
             % Define the parameters and their default values
             addOptional(p, 'Alpha', obj.Alpha, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
             addOptional(p, 'Magnitude', obj.Magnitude, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
-                        
+
             % Parse the inputs
             parse(p, varargin{:});
-            
+
             % Assign parsed values to object properties
             obj.Alpha = p.Results.Alpha;
             obj.Magnitude = p.Results.Magnitude;

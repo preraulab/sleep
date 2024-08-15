@@ -50,15 +50,29 @@ classdef SlowWaves < handle
         function obj = SlowWaves(varargin)
             %SLOWWAVES Construct an instance of this class with specified properties.
             %
+            %   This constructor creates an instance of the SlowWaves class, allowing
+            %   for the specification of various properties related to slow waves.
+            %   Default values for properties are used if not specified.
+            %
             %   Usage:
             %       obj = SlowWaves('PropertyName', PropertyValue, ...)
+            %
+            %   Inputs (default values in parentheses):
+            %       Rate: double - Frequency of slow waves in Hz (Default: 40/60)
+            %       Amp_mean: double - Mean amplitude of slow waves (Default: 80)
+            %       Amp_sd: double - Standard deviation of amplitude (Default: 5)
+            %       Dur_mean: double - Mean duration of slow waves in seconds (Default: 1.6)
+            %       Dur_sd: double - Standard deviation of duration (Default: 0.25)
+            %
+            %   Outputs:
+            %       obj: SlowWaves object - instance of the SlowWaves class with specified properties
             %
             %   Example:
             %       % Create an instance of SlowWaves with specific parameters
             %       sw = SlowWaves('Rate', 40/60, 'Amp_mean', 80, 'Amp_sd', 5, 'Dur_mean', 1.6, 'Dur_sd', 0.25);
             %
             %   See also: sim
-            
+
             % Create an input parser object
             p = inputParser;
 
@@ -103,7 +117,7 @@ classdef SlowWaves < handle
             %       plot(t, slow_wave_signal);
             %
             %   See also: SlowWaves
-            
+
             assert(nargin == 2, 'A time vector must be provided for simulation');
 
             % Total number of time points
