@@ -41,11 +41,13 @@ classdef Spindles < handle
 
     properties
         Freq_mean double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 15
-        Freq_sd double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 0.125
-        Amp_mean double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 6
-        Amp_sd double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 0.5
+        Freq_sd double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 0.2
+        Amp_mean double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 15
+        Amp_min double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 5
+        Amp_sd double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 0.125
         Dur_mean double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 1.5
         Dur_sd double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 0.25
+        Dur_min double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 0.5
         Baseline_rate double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 5/60
         Start_time double {mustBeNonnegative, mustBeReal, mustBeNumeric, mustBeNonempty} = 0
         Phase_pref double {mustBeReal, mustBeNumeric, mustBeNonempty} = 0
@@ -79,8 +81,10 @@ classdef Spindles < handle
             addOptional(p, 'Freq_sd', obj.Freq_sd, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
             addOptional(p, 'Amp_mean', obj.Amp_mean, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
             addOptional(p, 'Amp_sd', obj.Amp_sd, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
+            addOptional(p, 'Amp_min', obj.Amp_min, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
             addOptional(p, 'Dur_mean', obj.Dur_mean, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
             addOptional(p, 'Dur_sd', obj.Dur_sd, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
+              addOptional(p, 'Dur_min', obj.Dur_min, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
             addOptional(p, 'Baseline_rate', obj.Baseline_rate, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
             addOptional(p, 'Start_time', obj.Start_time, @(x) validateattributes(x, {'numeric'}, {'scalar', 'nonnegative'}));
             addOptional(p, 'Phase_pref', obj.Phase_pref, @(x) validateattributes(x, {'numeric'}, {'scalar'}));
@@ -99,8 +103,10 @@ classdef Spindles < handle
             obj.Freq_sd = p.Results.Freq_sd;
             obj.Amp_mean = p.Results.Amp_mean;
             obj.Amp_sd = p.Results.Amp_sd;
+            obj.Amp_min = p.Results.Amp_min;
             obj.Dur_mean = p.Results.Dur_mean;
             obj.Dur_sd = p.Results.Dur_sd;
+            obj.Dur_min = p.Results.Dur_min;
             obj.Baseline_rate = p.Results.Baseline_rate;
             obj.Start_time = p.Results.Start_time;
             obj.Phase_pref = p.Results.Phase_pref;
@@ -129,8 +135,8 @@ classdef Spindles < handle
                 spindle_times = spindle_times(spindle_times>obj.Start_time);
 
                 N_spindles = length(spindle_times);
-                spindle_durations = max(obj.Dur_mean + randn(1,N_spindles)*obj.Dur_mean,0);
-                spindle_amps =  max(obj.Amp_mean + randn(1,N_spindles)*obj.Amp_sd, 0);
+                spindle_durations = max(obj.Dur_mean + randn(1,N_spindles)*obj.Dur_sd, obj.Dur_min);
+                spindle_amps =  max(obj.Amp_mean + randn(1,N_spindles)*obj.Amp_sd, obj.Amp_min);
                 spindle_freqs = max(obj.Freq_mean + randn(1,N_spindles)*obj.Freq_sd,0);
          
                 spindle_phase = wrapToPi(interp1(t,unwrap(SO_phase), spindle_times));

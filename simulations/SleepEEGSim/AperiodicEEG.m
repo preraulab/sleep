@@ -5,8 +5,8 @@ classdef AperiodicEEG < handle
     %       opts = AperiodicEEG('PropertyName', PropertyValue, ...)
     %
     %   Properties (default values in parentheses):
-    %       Alpha: double - Exponent for 1/f^alpha noise (Default: 1.5)
-    %       Magnitude: double - Scaling factor for 1/f^alpha noise (Default: 5)
+    %       Alpha: double - Exponent for 1/f^alpha noise (Default: 1.8)
+    %       Magnitude: double - Scaling factor for 1/f^alpha noise (Default: 6)
     %       Signal: double array - Stored simulated noise signal (empty if no simulation is performed)
     %
     %   Methods:
@@ -26,8 +26,8 @@ classdef AperiodicEEG < handle
     % *********************************************************************
 
     properties
-        Alpha double {mustBeReal, mustBeNonempty} = 1.5; % Exponent for 1/f^alpha noise
-        Magnitude double {mustBePositive, mustBeReal, mustBeNonempty} = 5; % Scaling factor for 1/f^alpha noise
+        Alpha double {mustBeReal, mustBeNonempty} = 1.8; % Exponent for 1/f^alpha noise
+        Magnitude double {mustBePositive, mustBeReal, mustBeNonempty} = 6; % Scaling factor for 1/f^alpha noise
 
         Signal double = []; % Stored simulated noise signal
         

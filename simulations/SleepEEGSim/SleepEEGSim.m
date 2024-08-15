@@ -88,7 +88,7 @@ classdef SleepEEGSim < handle
     %               such as spindles and phase histograms.
     %
     %   Example:
-    %       %Run 
+    %       %Run
     %
     %       % Simulate 2 hours of EEG data at 128 Hz sampling rate.
     %       Fs = 128;
@@ -158,7 +158,7 @@ classdef SleepEEGSim < handle
                 T = 3600*2;
 
                 %Fast and slow spindle frequencies and phase preferences
-                freq_mean_fast = 15;
+                freq_mean_fast = 14;
                 phase_pref_fast = 0;
 
                 freq_mean_slow = 11;
@@ -174,20 +174,18 @@ classdef SleepEEGSim < handle
                 fast_spindles = Spindles('Freq_mean', freq_mean_fast, 'Phase_pref', phase_pref_fast, 'Ctrl_pts', ctrl_pts_fast, 'Theta_spline', theta_spline_fast);
                 slow_spindles = Spindles('Freq_mean', freq_mean_slow, 'Phase_pref', phase_pref_slow, 'Ctrl_pts', ctrl_pts_slow, 'Theta_spline', theta_spline_slow);
 
-                %Create slow and delta power
-                slow_power = BandEEG([1. 1.5], 10);
-                delta_power = BandEEG([1 5], 15);
+                % %Create slow and delta power
+                % slow_power = BandEEG([1. 1.5], 10);
+                % delta_power = BandEEG([1 5], 15);
 
                 simObj = SleepEEGSim('Fs',Fs);
 
                 simObj.addAperiodic;
                 simObj.addSlowWaves;
-                simObj.addBand(slow_power);
-                simObj.addBand(delta_power);
                 simObj.addSpindles(fast_spindles);
                 simObj.addSpindles(slow_spindles);
-                simObj.addLineNoise(LineNoise('sin',60,5));
-                simObj.addLineNoise(LineNoise('sawtooth',18,3));
+                simObj.addLineNoise(LineNoise('sin',60,15));
+                simObj.addLineNoise(LineNoise('sawtooth',18,10));
                 simObj.addArtifacts;
 
                 %Simulate the data
@@ -283,7 +281,7 @@ classdef SleepEEGSim < handle
             obj.Slow_Waves = sws;
         end
 
-        function sim(obj,T)
+        function obj = sim(obj,T)
             if nargin == 1
                 T = 3600;
             end
@@ -291,19 +289,24 @@ classdef SleepEEGSim < handle
             %Set time vector
             obj.t = 0:1/obj.Fs:T;
 
-            %Simulate baseline components
-            obj.Aperiodic.sim(obj.t);
-            obj.Slow_Waves.sim(obj.t);
+            SO_signal = zeros(size(obj.t));
 
-            for ii = 1:length(obj.BandSets)
-                obj.BandSets(ii).sim(obj.t);
+            %Simulate baseline components
+            if ~isempty(obj.Aperiodic)
+                obj.Aperiodic.sim(obj.t);
+                SO_signal = SO_signal + obj.Aperiodic.Signal;
             end
 
-            %Create SO from slow waves, bands, and aperiodic
-            SO_signal = obj.Aperiodic.Signal+obj.Slow_Waves.Signal;
+            if ~isempty(obj.Slow_Waves)
+                obj.Slow_Waves.sim(obj.t);
+                SO_signal = SO_signal + obj.Slow_Waves.Signal;
+            end
 
-            for ii = 1:length(obj.BandSets)
-                SO_signal = SO_signal + obj.BandSets(ii).Signal;
+            if ~isempty(obj.BandSets)
+                for ii = 1:length(obj.BandSets)
+                    obj.BandSets(ii).sim(obj.t);
+                    SO_signal = SO_signal + obj.BandSets(ii).Signal;
+                end
             end
 
             %Compute SO EEG and phase
@@ -322,10 +325,46 @@ classdef SleepEEGSim < handle
             obj.Artifacts.sim(obj.t);
 
             %Generate the signal
-            obj.Signal = obj.genSignal;
+            obj.genSignal;
         end
 
-        function signal = genSignal(obj)
+        function obj = deactivateAll(obj)
+            obj.Aperiodic.isActive = false;
+            obj.Slow_Waves.isActive = false;
+            obj.Artifacts.isActive = false;
+
+            for ii = 1:length(obj.BandSets)
+                obj.BandSets(ii).isActive = false;
+            end
+
+            for ii = 1:length(obj.SpindleSets)
+                obj.SpindleSets(ii).isActive = false;
+            end
+
+            for ii = 1:length(obj.LineNoiseSets)
+                obj.LineNoiseSets(ii).isActive = false;
+            end
+        end
+
+        function obj = activateAll(obj)
+            obj.Aperiodic.isActive = true;
+            obj.Slow_Waves.isActive = true;
+            obj.Artifacts.isActive = true;
+
+            for ii = 1:length(obj.BandSets)
+                obj.BandSets(ii).isActive = true;
+            end
+
+            for ii = 1:length(obj.SpindleSets)
+                obj.SpindleSets(ii).isActive = true;
+            end
+
+            for ii = 1:length(obj.LineNoiseSets)
+                obj.LineNoiseSets(ii).isActive = true;
+            end
+        end
+
+        function obj = genSignal(obj)
             if isempty(obj.t)
                 error('Simulation must be run first');
             end
@@ -334,6 +373,7 @@ classdef SleepEEGSim < handle
             if obj.Aperiodic.isActive
                 signal = signal + obj.Aperiodic.Signal;
             end
+
 
             if obj.Slow_Waves.isActive
                 signal = signal + obj.Slow_Waves.Signal;
@@ -361,6 +401,15 @@ classdef SleepEEGSim < handle
                     signal = signal + obj.LineNoiseSets(ii).Signal;
                 end
             end
+
+            obj.Signal = signal;
+        end
+
+        function plot_spect(obj)
+            obj.genSignal;
+            [spect, ~, sfreqs] =multitaper_spectrogram_mex(obj.Signal, obj.Fs,[.5 obj.Fs/2],[15 29],[30 5],'plot_on',false);
+
+            plot(sfreqs,pow2db(mean(spect,2)))
         end
 
         function plot(obj)
@@ -389,7 +438,7 @@ classdef SleepEEGSim < handle
             ax = figdesign(1,1,'orient','landscape','margin',[.1 .1 .05, .33  .03]);
             set(fh,"Position",[ 0.2948    0.1951    0.5866    0.5979]);
 
-            ax_split = split_axis(ax,[.7 .15 .15], 1);
+            ax_split = split_axis(ax,[.7 .1 .1 .1], 1);
 
             %Plot spectrogram
             axes(ax_split(1))
@@ -417,25 +466,39 @@ classdef SleepEEGSim < handle
             title('Simulated EEG','FontSize',30);
             axis tight
             linkaxes(ax_split,'x')
+            linkaxes(ax_split([2,3]),'y')
 
             %Plot Signal
             axes(ax_split(2))
-            hold all
-            plot(obj.t,obj.Signal)
+            plot(obj.t,obj.visfilt_EEG,'k')
 
-            set(gca,'fontsize',15);
+            set(gca,'xtick',[],'fontsize',15);
             xlabel('Time (s)');
             ylabel('mV');
-            ylim([-55 55])
+            pt = prctile(abs(obj.visfilt_EEG),99)+10;
+            ylim(ax_split(2),[-pt pt])
+
+
+            axes(ax_split(3))
+            hold all
+            for ii = 1:length(obj.SpindleSets)
+                if obj.SpindleSets(ii).isActive
+                    plot(obj.t,obj.SpindleSets(ii).Signal,'color',plot_colors(ii,:));
+                end
+            end
+            ylim(ax_split(3),[-pt pt])
+            ylabel('mV');
+            set(gca,'xtick',[],'fontsize',15);
 
             %Plot SO and Phase on the same axis
             %SO
-            axes(ax_split(3))
+            axes(ax_split(4))
             yyaxis left;
             plot(obj.t,obj.SO_EEG,'linewidth',2);
             ylabel('SO (mV)')
             set(gca,'fontsize',15);
-            ylim(gca,[-65 65])
+            ylim(ax_split(4),[-pt pt])
+            set(gca,'fontsize',15);
 
             %Phase
             yyaxis right;
@@ -447,7 +510,7 @@ classdef SleepEEGSim < handle
             xlabel('Time (s)')
             set(gca,'fontsize',15);
 
-            xlim([min(obj.t) max(obj.t)])
+
 
             if ~isempty(obj.SpindleSets)
                 hist_ax = axes('Position',[  0.7552    0.1290    0.2346    0.3415]);
@@ -507,7 +570,14 @@ classdef SleepEEGSim < handle
                 title(['Theta: ' num2str(theta_mod)])
             end
             axes(ax_split(1))
-            scrollzoompan(ax_split(1));
+            xlim([min(obj.t) max(obj.t)])
+            [zslider, pslider, zedit, pedit] = scrollzoompan(ax_split(1));
+            mid = mean(xlim);
+            xlim(ax_split(1), mid + [-15 15]);
+            zslider.Value = 30;
+            zedit.String = '30';
+            pslider.Value = mid;
+            pedit.String = mid;
         end
     end
 
@@ -532,6 +602,26 @@ classdef SleepEEGSim < handle
             SO_EEG = filtfilt(d,baseline_signal);
             %Extract SO-phase
             SO_phase = angle(hilbert(SO_EEG));
+        end
+
+        function vfilt_sig = visfilt_EEG(obj)
+            %% Compute SO
+
+            %Compute SO band filter
+            SO_freqrange = [.3 35];
+            d = designfilt('bandpassiir', ...       % Response type
+                'StopbandFrequency1',SO_freqrange(1)-0.1, ...    % Frequency constraints
+                'PassbandFrequency1',SO_freqrange(1), ...
+                'PassbandFrequency2',SO_freqrange(2), ...
+                'StopbandFrequency2',SO_freqrange(2)+1, ...
+                'StopbandAttenuation1',60, ...   % Magnitude constraints
+                'PassbandRipple',1, ...
+                'StopbandAttenuation2',60, ...
+                'DesignMethod','ellip', ...      % Design method
+                'MatchExactly','passband', ...   % Design method options
+                'SampleRate',obj.Fs);
+            %% Create baseline signal
+            vfilt_sig = filtfilt(d,obj.Signal);
         end
     end
 
