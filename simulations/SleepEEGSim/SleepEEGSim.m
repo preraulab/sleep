@@ -1,7 +1,7 @@
 classdef SleepEEGSim < handle
     %SLEEPEEGSIM Simulate EEG data with multiple components including slow waves, spindles, and noise.
     %
-    %   simObj = SleepEEGSim('Fs', Fs); % Create a SleepEEGSim object with specified sampling frequency
+    %   simObj = SleepEEGSim(Fs); % Create a SleepEEGSim object with specified sampling frequency
     %   simObj = SleepEEGSim('demo'); % Run the demo simulation
     %
     %   Inputs (default values in parentheses):
@@ -23,7 +23,7 @@ classdef SleepEEGSim < handle
     %       SO_EEG: array - Signal for slow oscillations
     %       SO_phase: array - Phase of slow oscillations
     %
-    %   Methods:
+    %   Constructor:
     %       SleepEEGSim: Constructor for the SleepEEGSim class
     %           Usage:
     %               simObj = SleepEEGSim('demo');
@@ -32,107 +32,102 @@ classdef SleepEEGSim < handle
     %               at 128 Hz sampling rate, including spindles, line noise, and artifacts.
     %               If no input arguments are provided, the default values are used.
     %
-    %       addAperiodic: Add aperiodic EEG component
-    %           Usage:
-    %               obj = addAperiodic(obj, ap);
-    %           Inputs:
-    %               ap: AperiodicEEG object (Default: new instance of AperiodicEEG)
+    %  Methods: (use help for more info, e.g. 'help SleepEEGSim.plotSpect', or 'doc SleepEEGSim' for all methods)
+    %       addBand         componentNames  getComponents   plotSpect
+    %       activateAll     addLineNoise    deactivateAll   numComponents   setActive
+    %       addAperiodic    addSlowWaves    genSignal       plot            sim
+    %       addArtifacts    addSpindles     getActive       plotComponents
     %
-    %       addLineNoise: Add line noise component
-    %           Usage:
-    %               obj = addLineNoise(obj, ln);
-    %           Inputs:
-    %               ln: LineNoise object (Default: new instance of LineNoise)
-    %
-    %       addSpindles: Add spindle component
-    %           Usage:
-    %               obj = addSpindles(obj, ss);
-    %           Inputs:
-    %               ss: Spindles object (Default: new instance of Spindles)
-    %
-    %       addBand: Add frequency band component
-    %           Usage:
-    %               obj = addBand(obj, bb);
-    %           Inputs:
-    %               bb: BandEEG object (Default: new instance of BandEEG)
-    %
-    %       addArtifacts: Add motion artifacts component
-    %           Usage:
-    %               obj = addArtifacts(obj, arts);
-    %           Inputs:
-    %               arts: MotionArtifacts object (Default: new instance of MotionArtifacts)
-    %
-    %       addSlowWaves: Add slow waves component
-    %           Usage:
-    %               obj = addSlowWaves(obj, sws);
-    %           Inputs:
-    %               sws: SlowWaves object (Default: new instance of SlowWaves)
-    %
-    %       sim: Simulate EEG data
-    %           Usage:
-    %               obj = sim(obj, T);
-    %           Inputs:
-    %               T: Duration of simulation in seconds (Default: 3600)
-    %
-    %       genSignal: Generate the final simulated EEG signal
-    %           Usage:
-    %               signal = genSignal(obj);
-    %           Outputs:
-    %               signal: array - Final simulated EEG signal
-    %
-    %       plot: Plot the simulated EEG data
-    %           Usage:
-    %               obj.plot();
-    %           Description:
-    %               Plots the simulated EEG signal, spectrogram, and additional components
-    %               and spindle properties such model and fit phase and history properties.
     %
     %   Example:
+    %       %-------------------------
+    %       % Simulation Parameters
+    %       %-------------------------
     %       % Simulate 2 hours of EEG data at 128 Hz sampling rate.
     %       Fs = 128;
     %       T = 3600 * 2; % Duration of simulation in seconds
-    %
+    %       
+    %       %-------------------------
+    %       % Create Spindles objects
+    %       %-------------------------
     %       % Define spindle parameters (frequency and phase preferences)
     %       freq_mean_fast = 15;
     %       phase_pref_fast = 0;
     %       freq_mean_slow = 11;
     %       phase_pref_slow = -pi/3;
-    %
+    %       
     %       % Define control points and spline parameters
     %       ctrl_pts_fast = [ -3, 0, 3, 4.5, 8, 9, 12, 15, 18, 45, 50, 55, 65, 85 ];
     %       theta_spline_fast = log([ 1e-5, 1e-2, 1, 2, 1, 1, 1, 1, 1, 1, 1.5, 1, 1, 1 ]);
     %       ctrl_pts_slow = [ -3, 0, 4, 6, 8, 9, 12, 15, 18, 40, 45, 55, 65, 85 ];
     %       theta_spline_slow = log([ 1e-5, 1e-2, 1, 3, 1, 1, 1, 1, 1, 1, 1.2, 1, 1, 1 ]);
-    %
-    %       % Create spindle objects
+    %       
     %       fast_spindles = Spindles('Freq_mean', freq_mean_fast, 'Phase_pref', phase_pref_fast, 'Ctrl_pts', ctrl_pts_fast, 'Theta_spline', theta_spline_fast);
     %       slow_spindles = Spindles('Freq_mean', freq_mean_slow, 'Phase_pref', phase_pref_slow, 'Ctrl_pts', ctrl_pts_slow, 'Theta_spline', theta_spline_slow);
-    %
-    %       % Create band components
+    %       
+    %       %-------------------------
+    %       % Create BandEEG objects
+    %       %-------------------------
     %       slow_power = BandEEG([1 1.5], 10);
     %       delta_power = BandEEG([1 5], 15);
-    %
-    %       % Create simulation object
+    %       
+    %       %-------------------------
+    %       % Create LineNoise objects
+    %       %-------------------------
+    %       sixtyHz = LineNoise('sin', 60, 5);
+    %       harmonic_noise = LineNoise('sawtooth', 18, 3);
+    %       
+    %       %-------------------------
+    %       % Create SleepEEGSim object
+    %       %-------------------------
     %       simObj = SleepEEGSim('Fs', Fs);
-    %       simObj.addAperiodic;
-    %       simObj.addSlowWaves;
+    %       
+    %       %Add components
+    %       simObj.addAperiodic; %Use defaults
+    %       simObj.addSlowWaves; %Use defaults
     %       simObj.addBand(slow_power);
     %       simObj.addBand(delta_power);
     %       simObj.addSpindles(fast_spindles);
     %       simObj.addSpindles(slow_spindles);
-    %       simObj.addLineNoise(LineNoise('sin', 60, 5));
-    %       simObj.addLineNoise(LineNoise('sawtooth', 18, 3));
-    %       simObj.addArtifacts;
-    %
-    %       % Run the simulation
-    %       simObj.sim(T);
-    %
-    %       % Plot the results
+    %       simObj.addLineNoise(sixtyHz);
+    %       simObj.addLineNoise(harmonic_noise);
+    %       simObj.addArtifacts; %Use defaults
+    %       
+    %       % Run the simulation and plot
+    %       simObj.sim;
+    %       
+    %       %-------------------------
+    %       % Plotting
+    %       %-------------------------
     %       simObj.plot;
+    %       %Plot the spectrum
+    %       simObj.plotSpect
+    %       %Plot the components
+    %       simObj.plotComponents
+    %       
+    %       %-------------------------
+    %       % Modifications
+    %       %-------------------------
+    %       %Change some parameters
+    %       simObj.Aperiodic.Magnitude = 8;
+    %       simObj.Artifacts.Rate = 20/3600;
+    %       simObj.SpindleSets(1).Freq_mean = 14;
+    %       
+    %       %Rerun the simulation and plot
+    %       simObj.sim
+    %       simObj.plot
+    %       
+    %       %Deactivate some components
+    %       simObj.setActive([1 1 0 0 1 1 0 0 0]);
+    %       %Plot and limit spectrum range
+    %       simObj.plot(true, [.5 25]);
+    %       
+    %       %Reactivate all components
+    %       simObj.activateAll;
+    %       
     %
     %    Copyright 2024 Michael J. Prerau Laboratory. - http://www.sleepEEG.org
     % *********************************************************************
-
 
     properties
         Fs = 128;  % Sampling frequency in Hz
@@ -552,8 +547,8 @@ classdef SleepEEGSim < handle
             obj.Signal = signal;
         end
 
-        function plot_spect(obj)
-            %PLOT_SPECT Plot the spectrogram of the generated signal
+        function plotSpect(obj)
+            %PLOTSPECT Plot the spectrogram of the generated signal
             %
             %   This method generates the signal using the genSignal method and then
             %   computes and plots its spectrogram using the multitaper_spectrogram_mex function.
@@ -569,16 +564,23 @@ classdef SleepEEGSim < handle
             %       % Create an instance of SleepEEGSim and generate the signal
             %       eeg_sim = SleepEEGSim();
             %       % Plot the spectrogram
-            %       eeg_sim.plot_spect();
+            %       eeg_sim.plotSpect();
 
+            figure;
 
             obj.genSignal;
-            [spect, ~, sfreqs] = multitaper_spectrogram_mex(obj.Signal, obj.Fs, [.5 obj.Fs/2], [15 29], [30 5], 'plot_on', false);
+            [spect, ~, sfreqs] = multitaper_spectrogram_mex(obj.Signal, obj.Fs, [.1 obj.Fs/2], [15 29], [30 5], 'plot_on', false);
 
             plot(sfreqs, pow2db(mean(spect, 2)));
+            axis tight;
+            xlabel('Frequency (Hz)')
+            ylabel('Power (dB)')
+            grid on
+
+            title("Simulation Power Spectrum")
         end
 
-        function plot(obj)
+        function plot(obj, visual_filter, spect_range)
             %PLOT Generate plots for the simulated EEG signal and its components
             %
             %   This method generates several plots related to the simulated EEG signal.
@@ -590,6 +592,10 @@ classdef SleepEEGSim < handle
             %
             %   Inputs:
             %       obj: SleepEEGSim object - instance of the SleepEEGSim class
+            %       visual_filter: logical - Filter the display of the EEG time
+            %           series between .3 and 35Hz (default: true)
+            %       spect_range: double 1x2 - frequency range of the
+            %                       spectrogram (default: 0.1 Hz - Nyquist)
             %
             %   Outputs:
             %       None. This method generates and displays multiple plots, including:
@@ -598,9 +604,21 @@ classdef SleepEEGSim < handle
             %       - Individual spindle components
             %       - Slow waves and phase information
             %       - Modulation history curve and phase histogram of spindles (if spindle data are present)
+            %
+            %   Example:
+            %       SS = SleepEEGSim('demo');
+            %       SS.plot(true,[.5 25])
 
             if isempty(obj.Signal)
                 obj.sim;
+            end
+
+            if nargin<2
+                visual_filter = true;
+            end
+
+            if nargin<3
+                spect_range = [.1 obj.Fs/2];
             end
 
             %Set consistent plot colors for each spindle set
@@ -615,7 +633,7 @@ classdef SleepEEGSim < handle
 
             %Compute MTS
             warning('off')
-            [spect, stimes, sfreqs] = multitaper_spectrogram_mex(obj.Signal, obj.Fs, [.5 obj.Fs/2], [2 3], [1 .05], 2^10,'constant','plot_on',false,'verbose',false);
+            [spect, stimes, sfreqs] = multitaper_spectrogram_mex(obj.Signal, obj.Fs, spect_range, [2 3], [1 .05], 2^10,'constant','plot_on',false,'verbose',false);
             warning('on')
 
             %Estimate history for each spindle set
@@ -638,7 +656,7 @@ classdef SleepEEGSim < handle
             colorbar_noresize;
             colormap(rainbow4);
 
-            if ~isempty(obj.SpindleSets)
+            if ~isempty(obj.SpindleSets) & any([obj.SpindleSets.isActive])
                 hold on
                 s = scatter(cat(2,obj.SpindleSets.Times),cat(2,obj.SpindleSets.Freqs),40,'k','filled');
                 %Add informative datatips to each spindle
@@ -658,24 +676,34 @@ classdef SleepEEGSim < handle
             linkaxes(ax_split,'x')
             linkaxes(ax_split([2,3]),'y')
 
+            %Apply visual filter if needed
+            if visual_filter
+                ts_plot = obj.visfilt_EEG;
+            else
+                ts_plot = obj.Signal;
+            end
+
             %Plot filtered EEG signal
             axes(ax_split(2))
-            plot(obj.t,obj.visfilt_EEG,'k')
+            plot(obj.t,ts_plot,'k')
 
             set(gca,'xtick',[],'fontsize',15);
             xlabel('Time (s)');
             ylabel('mV');
-            pt = prctile(abs(obj.visfilt_EEG),99)+10;
+            pt = prctile(abs(ts_plot),99)+10;
             ylim(ax_split(2),[-pt pt])
 
             %Plot spindle components
             axes(ax_split(3))
-            hold all
-            for ii = 1:length(obj.SpindleSets)
-                if obj.SpindleSets(ii).isActive
-                    plot(obj.t,obj.SpindleSets(ii).Signal,'color',plot_colors(ii,:));
+            if ~isempty(obj.SpindleSets)
+                hold all
+                for ii = 1:length(obj.SpindleSets)
+                    if obj.SpindleSets(ii).isActive
+                        plot(obj.t,obj.SpindleSets(ii).Signal,'color',plot_colors(ii,:));
+                    end
                 end
             end
+
             ylim(ax_split(3),[-pt pt])
             ylabel('mV');
             set(gca,'xtick',[],'fontsize',15);
@@ -706,61 +734,75 @@ classdef SleepEEGSim < handle
                 hold on
 
                 for ss = 1:length(obj.SpindleSets)
-                    hold on
-                    c = exp(b{ss}(1));
-                    fill([t_sp{ss}, fliplr(t_sp{ss})], [yhat{ss} / c - dylo{ss} / c; flipud(yhat{ss} / c + dyhi{ss} / c)],  plot_colors(ss,:), 'FaceAlpha', 0.2, 'EdgeColor', 'none');
-                    plot(t_sp{ss}, yhat{ss} / c,  'color', plot_colors(ss,:), 'linewidth', 2);
+                    if obj.SpindleSets(ss).isActive
+                        hold on
+                        c = exp(b{ss}(1));
+                        fill([t_sp{ss}, fliplr(t_sp{ss})], [yhat{ss} / c - dylo{ss} / c; flipud(yhat{ss} / c + dyhi{ss} / c)],  plot_colors(ss,:), 'FaceAlpha', 0.2, 'EdgeColor', 'none');
+                        plot(t_sp{ss}, yhat{ss} / c,  'color', plot_colors(ss,:), 'linewidth', 2);
 
-                    %Plot true curve dashed
-                    obj.SpindleSets(ss).plot_spline('linewidth',1,'linestyle','--','color', plot_colors(ss,:));
+                        %Plot true curve dashed
+                        obj.SpindleSets(ss).plot_spline('linewidth',1,'linestyle','--','color', plot_colors(ss,:));
 
-                    axis tight;
-                    xlabel('Lag (s)');
-                    ylabel('Modulation');
+                        axis tight;
+                        xlabel('Lag (s)');
+                        ylabel('Modulation');
 
-                    xlabel("Time Since Last Spindle (s)")
-                    ylabel('Modulation Factor')
-                    title('History Modulation Curve')
-                    set(hist_ax,'fontsize',15)
+                        xlabel("Time Since Last Spindle (s)")
+                        ylabel('Modulation Factor')
+
+                        set(hist_ax,'fontsize',15)
+                    end
                 end
                 axis tight;
                 ylim([0 min(max(ylim(gca)),10)]);
+                if any([obj.SpindleSets.isActive])
+                    title('History Modulation Curve')
+                else
+                    title('No Active Spindles')
+                end
 
 
                 h_pax = polaraxes('position',[0.7636    0.5732    0.2087    0.3507]);
                 %Plot phase histogram
                 for ss = 1:length(obj.SpindleSets)
-                    b1 = (b{ss}(end-1));
-                    b2 = (b{ss}(end));
+                    if obj.SpindleSets(ss).isActive
+                        b1 = (b{ss}(end-1));
+                        b2 = (b{ss}(end));
 
-                    theta_mod(ss) = atan2(b1,b2);
-                    rho_mod(ss) = sqrt(b1.^2+b2.^2);
+                        theta_mod(ss) = atan2(b1,b2);
+                        rho_mod(ss) = sqrt(b1.^2+b2.^2);
 
-                    %Compute the mean population vector
-                    vect_mean = mean(exp(1i*obj.SpindleSets(ss).Phase));
+                        %Compute the mean population vector
+                        vect_mean = mean(exp(1i*obj.SpindleSets(ss).Phase));
 
-                    %Get the mean magnitude and angle
-                    rho_samp(ss) = abs(vect_mean);
-                    theta_samp(ss) = angle(vect_mean);
+                        %Get the mean magnitude and angle
+                        rho_samp(ss) = abs(vect_mean);
+                        theta_samp(ss) = angle(vect_mean);
 
-                    %Plot histogram
-                    h_phist = polarhistogram(obj.SpindleSets(ss).Phase,'Normalization','pdf');
-                    h_pax.ThetaAxisUnits = 'radians';
-                    h_pax.ThetaTick = 0:pi/4:2*pi;
-                    h_pax.ThetaTickLabel = {'0','\pi/4','\pi/2','3\pi/4' '\pm\pi','-3\pi/4', '-\pi/2','-\pi/4'};
-                    h_pax.FontSize = 14;
+                        %Plot histogram
+                        h_phist = polarhistogram(obj.SpindleSets(ss).Phase,'Normalization','pdf');
+                        h_pax.ThetaAxisUnits = 'radians';
+                        h_pax.ThetaTick = 0:pi/4:2*pi;
+                        h_pax.ThetaTickLabel = {'0','\pi/4','\pi/2','3\pi/4' '\pm\pi','-3\pi/4', '-\pi/2','-\pi/4'};
+                        h_pax.FontSize = 14;
 
-                    %Add mean arrow
-                    hold on
-                    polarplot([theta_mod(ss) theta_mod(ss)],[0 rho_mod(ss)],'linestyle','-','color',plot_colors(ss,:),'linewidth',3);
-                    polarplot([theta_samp(ss) theta_samp(ss)],[0 rho_samp(ss)],'linestyle','--','color',plot_colors(ss,:),'linewidth',2);
+                        %Add mean arrow
+                        hold on
+                        polarplot([theta_mod(ss) theta_mod(ss)],[0 rho_mod(ss)],'linestyle','-','color',plot_colors(ss,:),'linewidth',3);
+                        polarplot([theta_samp(ss) theta_samp(ss)],[0 rho_samp(ss)],'linestyle','--','color',plot_colors(ss,:),'linewidth',2);
 
-                    h_phist.FaceColor = plot_colors(ss,:);
-                    h_phist.FaceAlpha = .4;
-                    h_phist.NumBins = 50;
-                    hold on
+                        h_phist.FaceColor = plot_colors(ss,:);
+                        h_phist.FaceAlpha = .4;
+                        h_phist.NumBins = 50;
+                        hold on
+                    end
                 end
-                title(['Theta: ' num2str(theta_mod)])
+
+                if any([obj.SpindleSets.isActive])
+                    title(['Theta: ' num2str(theta_mod)])
+                else
+                    title('No Active Spindles')
+                end
             end
 
             %Add scrollbars and adjust axes
@@ -775,7 +817,320 @@ classdef SleepEEGSim < handle
             pslider.Value = mid;
             pedit.String = mid;
         end
+
+        function [components, names]= getComponents(obj)
+            %GETCOMPONENTS Get a matrix of signal components and associated names
+            %
+            %   This method returns the signal components and names
+            %
+            %   Inputs:
+            %       obj: SleepEEGSim object - instance of the SleepEEGSim class
+            %
+            %   Outputs:
+            %       components: N x T A matrix of signal components
+            %       names: 1 x N cell of chars of signal names
+
+            assert(~isempty(obj.Signal), 'Must have valid signal generated. Run simulation');
+
+            N = obj.numComponents;
+            T = length(obj.Signal);
+
+            %Check for empty object
+            if N == 0
+                components = nan;
+                return;
+            end
+
+            components = zeros(N,T);
+            cc = 1;
+
+            if ~isempty(obj.Aperiodic)
+                components(cc,:) = obj.Aperiodic.Signal;
+                cc = cc + 1;
+            end
+
+            if ~isempty(obj.Slow_Waves)
+                components(cc,:) = obj.Slow_Waves.Signal;
+                cc = cc + 1;
+            end
+
+            if ~isempty(obj.BandSets)
+                for ii = 1:length(obj.BandSets)
+                    band = obj.BandSets(ii);
+                    components(cc,:) = band.Signal;
+                    cc = cc + 1;
+                end
+            end
+
+            if ~isempty(obj.SpindleSets)
+                for ii = 1:length(obj.SpindleSets)
+                    spindle = obj.SpindleSets(ii);
+                    components(cc,:) = spindle.Signal;
+                    cc = cc + 1;
+                end
+            end
+
+            if ~isempty(obj.LineNoiseSets)
+                for ii = 1:length(obj.LineNoiseSets)
+                    ln = obj.LineNoiseSets(ii);
+                    components(cc,:) = ln.Signal;
+                    cc = cc + 1;
+                end
+            end
+
+            if ~isempty(obj.Artifacts)
+                components(cc,:) = obj.Artifacts.Signal;
+            end
+
+            if nargout == 2
+                names = obj.componentNames;
+            end
+        end
+
+        function isActive = getActive(obj)
+            %ISACTIVE Show the activation of each componentn
+            %
+            %   This method return a vector of isActive properties of the
+            %   model components
+            %
+            %   Inputs:
+            %       obj: SleepEEGSim object - instance of the SleepEEGSim class
+            %
+            %   Outputs:
+            %       isActive: 1 x N A logical vector of activation states
+
+            isActive = false(1, obj.numComponents);
+
+            cc = 1;
+            if ~isempty(obj.Aperiodic)
+                isActive(cc) = obj.Aperiodic.isActive;
+                cc = cc+1;
+            end
+
+            if ~isempty(obj.Slow_Waves)
+                isActive(cc) =  obj.Slow_Waves.isActive;
+                cc = cc+1;
+            end
+
+            if ~isempty(obj.BandSets)
+                for ii = 1:length(obj.BandSets)
+                    band = obj.BandSets(ii);
+                    isActive(cc) =  band.isActive;
+                    cc = cc+1;
+                end
+            end
+
+            if ~isempty(obj.SpindleSets)
+                for ii = 1:length(obj.SpindleSets)
+                    spindle = obj.SpindleSets(ii);
+                    isActive(cc) =  spindle.isActive;
+                    cc = cc+1;
+                end
+            end
+
+            if ~isempty(obj.LineNoiseSets)
+                for ii = 1:length(obj.LineNoiseSets)
+                    ln = obj.LineNoiseSets(ii);
+                    isActive(cc) =  ln.isActive;
+                    cc = cc+1;
+                end
+            end
+
+            if ~isempty(obj.Artifacts)
+                isActive(cc) =  obj.Artifacts.isActive;
+            end
+        end
+
+        function setActive(obj, isActive)
+            %ISACTIVE Shows the activation state of each component
+            %
+            %   This method sets the isActive properties of the model
+            %   components
+            %
+            %   Inputs:
+            %       obj: SleepEEGSim object - instance of the SleepEEGSim class
+            %       isActive: 1 x N (number of components) logical vector
+            %       to set the isActive state of each component
+            %
+            %   Outputs:
+            %       isActive: 1 x N A logical vector of activation states
+
+            %Check the correct number of components
+            assert(length(isActive) == obj.numComponents, ['Number of active components must be ' num2str(obj.numComponents)]);
+
+            cc = 1;
+            if ~isempty(obj.Aperiodic)
+                obj.Aperiodic.isActive = isActive(cc);
+                cc = cc+1;
+            end
+
+            if ~isempty(obj.Slow_Waves)
+                obj.Slow_Waves.isActive = isActive(cc);
+                cc = cc+1;
+            end
+
+
+            if ~isempty(obj.BandSets)
+                for ii = 1:length(obj.BandSets)
+                    band = obj.BandSets(ii);
+                    band.isActive = isActive(cc);
+                    cc = cc+1;
+                end
+            end
+
+            if ~isempty(obj.SpindleSets)
+                for ii = 1:length(obj.SpindleSets)
+                    spindle = obj.SpindleSets(ii);
+                    spindle.isActive = isActive(cc);
+                    cc = cc+1;
+                end
+            end
+
+            if ~isempty(obj.LineNoiseSets)
+                for ii = 1:length(obj.LineNoiseSets)
+                    ln = obj.LineNoiseSets(ii);
+                    ln.isActive = isActive(cc);
+                    cc = cc+1;
+                end
+            end
+
+            if ~isempty(obj.Artifacts)
+                obj.Artifacts.isActive = isActive(cc);
+            end
+
+            %Generate the updated signal
+            obj.genSignal;
+        end
+
+
+        function N = numComponents(obj)
+            %NUMCOMPONENTS Return the number of components
+            %
+            %   This method computes the number of model components
+            %
+            %   Inputs:
+            %       obj: SleepEEGSim object - instance of the SleepEEGSim class
+            %
+            %   Outputs:
+            %       N: The number of components
+
+            N = 0;
+
+            if ~isempty(obj.Aperiodic)
+                N = N+1;
+            end
+
+            if ~isempty(obj.Slow_Waves)
+                N = N+1;
+            end
+
+            if ~isempty(obj.BandSets)
+                N = N + length(obj.BandSets);
+            end
+
+            if ~isempty(obj.SpindleSets)
+                N = N + length(obj.SpindleSets);
+            end
+
+            if ~isempty(obj.LineNoiseSets)
+                N = N + length(obj.LineNoiseSets);
+            end
+
+            if ~isempty(obj.Artifacts)
+                N = N + 1;
+            end
+        end
+
+        function component_names = componentNames(obj)
+            %COMPONENTNAMES Gets the name of each component
+            %
+            %   This method returns the component names of all components
+            %
+            %   Inputs:
+            %       obj: SleepEEGSim object - instance of the SleepEEGSim class
+            %
+            %   Outputs:
+            %       component_names: 1 x N A string vector of component
+            %       names
+
+            component_names = {};
+
+            if ~isempty(obj.Aperiodic)
+                component_names{end+1} = 'Aperiodic';
+            end
+
+            if ~isempty(obj.Slow_Waves)
+                component_names{end+1} = 'Slow Waves';
+            end
+
+            if ~isempty(obj.BandSets)
+                for ii = 1:length(obj.BandSets)
+                    band = obj.BandSets(ii);
+                    component_names{end+1} = ['BandSet ' num2str(band.FrequencyRange(1)) '-' num2str(band.FrequencyRange(2))];
+                end
+            end
+
+            if ~isempty(obj.SpindleSets)
+                for ii = 1:length(obj.SpindleSets)
+                    spindle = obj.SpindleSets(ii);
+                    component_names{end+1} = ['Spindles ' num2str(spindle.Freq_mean) 'Hz'];
+                end
+            end
+
+            if ~isempty(obj.LineNoiseSets)
+                for ii = 1:length(obj.LineNoiseSets)
+                    ln = obj.LineNoiseSets(ii);
+                    component_names{end+1} = ['Line Noise ' ln.Waveform ' ' num2str(ln.Freq) 'Hz'];
+                end
+            end
+
+            if ~isempty(obj.Artifacts)
+                component_names{end+1} = 'Artifacts';
+            end
+        end
+
+        function plotComponents(obj)
+            %PLOTCOMPONENTS Plot all signal components
+            %
+            %   This method plots each of the components on a large plot in
+            %   separate axes
+            %
+            %   Inputs:
+            %       obj: SleepEEGSim object - instance of the SleepEEGSim class
+            %
+            %   Outputs:
+            %       None. This method generates a plot of the spectrogram.
+            %
+            %   Example:
+            %       % Create an instance of SleepEEGSim and generate the signal
+            %       eeg_sim = SleepEEGSim('demo');
+            %       % Plot the spectrogram
+            %       eeg_sim.plotComponents();
+
+            [comps, names] = obj.getComponents;
+            N = obj.numComponents;
+
+            fh = figure;
+            ax = figdesign(N,1,'type','usletter','orient','landscape','margins',[.05 .1 .1 .025 .03]);
+            set(fh,'Position',[0.0619    0.0861    0.6395    0.8333]);
+
+
+            outerlabels(ax,'Time (s)','Components')
+
+            for ii = 1:N
+                axes(ax(ii))
+                plot(obj.t, comps(ii,:))
+                axis tight
+                title(names{ii})
+            end
+            linkaxes(ax,'x');
+            set(ax,'fontsize',15)
+            set(ax(1:end-1),'xtick',[]);
+
+            scrollzoompan(ax)
+        end
     end
+
 
     methods (Access = protected)
         function [SO_phase, SO_EEG] = computeSOPhase(obj, baseline_signal)
