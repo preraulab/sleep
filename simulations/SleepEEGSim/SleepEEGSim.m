@@ -673,7 +673,7 @@ classdef SleepEEGSim < handle
 
                 %Plot simulated signal
                 ax = figdesign(1,1,'orient','landscape','margin',[.1 .1 .05, .33  .03]);
-                set(obj.mainplot_fig,"Position",[ 0.2948    0.1951    0.5866    0.5979]);
+                set(obj.mainplot_fig,"Position",[0.0270    0.0701    0.8710    0.8576]);
 
                 obj.signal_ax = split_axis(ax,[.7 .1 .1 .1], 1);
                 set(obj.signal_ax,'nextplot','replacechildren');
@@ -1230,7 +1230,7 @@ classdef SleepEEGSim < handle
 
             %Set up Ui Figure
             if isempty(obj.setactive_fig) | ~ishandle(obj.setactive_fig)
-                obj.setactive_fig = uifigure('Units','normalized','Position', [0.5   0.6    0.1000    0.5000]);
+                obj.setactive_fig = uifigure('Units','normalized','Position', [0.8   0.6    0.1000    0.5000]);
                 obj.setactive_fig.Units = "pixels";
                 obj.setactive_fig.Name = 'Select Components';
                 obj.setactive_fig.Position(3:4) = [350 450];
