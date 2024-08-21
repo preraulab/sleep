@@ -28,7 +28,7 @@ classdef SleepEEGSim < handle
     %           Usage:
     %               simObj = SleepEEGSim('demo');
     %           Description:
-    %               Initializes a SleepEEGSim object. If 'demo' is passed, simulates 2 hours of EEG data
+    %               Initializes a SleepEEGSim object. If 'demo' is passed, simulates 1 hour of EEG data
     %               at 128 Hz sampling rate, including spindles, line noise, and artifacts.
     %               If no input arguments are provided, the default values are used.
     %
@@ -46,7 +46,7 @@ classdef SleepEEGSim < handle
     %       % Simulate 2 hours of EEG data at 128 Hz sampling rate.
     %       Fs = 128;
     %       T = 3600 * 2; % Duration of simulation in seconds
-    %       
+    %
     %       %-------------------------
     %       % Create Spindles objects
     %       %-------------------------
@@ -55,33 +55,33 @@ classdef SleepEEGSim < handle
     %       phase_pref_fast = 0;
     %       freq_mean_slow = 11;
     %       phase_pref_slow = -pi/3;
-    %       
+    %
     %       % Define control points and spline parameters
     %       ctrl_pts_fast = [ -3, 0, 3, 4.5, 8, 9, 12, 15, 18, 45, 50, 55, 65, 85 ];
     %       theta_spline_fast = log([ 1e-5, 1e-2, 1, 2, 1, 1, 1, 1, 1, 1, 1.5, 1, 1, 1 ]);
     %       ctrl_pts_slow = [ -3, 0, 4, 6, 8, 9, 12, 15, 18, 40, 45, 55, 65, 85 ];
     %       theta_spline_slow = log([ 1e-5, 1e-2, 1, 3, 1, 1, 1, 1, 1, 1, 1.2, 1, 1, 1 ]);
-    %       
+    %
     %       fast_spindles = Spindles('Freq_mean', freq_mean_fast, 'Phase_pref', phase_pref_fast, 'Ctrl_pts', ctrl_pts_fast, 'Theta_spline', theta_spline_fast);
     %       slow_spindles = Spindles('Freq_mean', freq_mean_slow, 'Phase_pref', phase_pref_slow, 'Ctrl_pts', ctrl_pts_slow, 'Theta_spline', theta_spline_slow);
-    %       
+    %
     %       %-------------------------
     %       % Create BandEEG objects
     %       %-------------------------
     %       slow_power = BandEEG([1 1.5], 10);
     %       delta_power = BandEEG([1 5], 15);
-    %       
+    %
     %       %-------------------------
     %       % Create LineNoise objects
     %       %-------------------------
     %       sixtyHz = LineNoise('sin', 60, 5);
     %       harmonic_noise = LineNoise('sawtooth', 18, 3);
-    %       
+    %
     %       %-------------------------
     %       % Create SleepEEGSim object
     %       %-------------------------
     %       simObj = SleepEEGSim('Fs', Fs);
-    %       
+    %
     %       %Add components
     %       simObj.addAperiodic; %Use defaults
     %       simObj.addSlowWaves; %Use defaults
@@ -92,19 +92,23 @@ classdef SleepEEGSim < handle
     %       simObj.addLineNoise(sixtyHz);
     %       simObj.addLineNoise(harmonic_noise);
     %       simObj.addArtifacts; %Use defaults
-    %       
+    %
     %       % Run the simulation and plot
     %       simObj.sim;
-    %       
+    %
     %       %-------------------------
     %       % Plotting
     %       %-------------------------
+    %       %Plot      
     %       simObj.plot;
+    %       %Set active components interactively
+    %       simObj.setActive();
+    %
     %       %Plot the spectrum
     %       simObj.plotSpect
     %       %Plot the components
     %       simObj.plotComponents
-    %       
+    %
     %       %-------------------------
     %       % Modifications
     %       %-------------------------
@@ -112,19 +116,22 @@ classdef SleepEEGSim < handle
     %       simObj.Aperiodic.Magnitude = 8;
     %       simObj.Artifacts.Rate = 20/3600;
     %       simObj.SpindleSets(1).Freq_mean = 14;
-    %       
+    %
     %       %Rerun the simulation and plot
     %       simObj.sim
     %       simObj.plot
-    %       
-    %       %Deactivate some components
+    %
+    %       %Modify some components and verify
     %       simObj.setActive([1 1 0 0 1 1 0 0 0]);
+    %       disp(simObj.getActive);
+    %       simObj.deactivateAll; %Deactivate all
+    %       disp(simObj.getActive);
+    %       simObj.activateAll; %Reactivate all
+    %       disp(simObj.getActive);
+    %
     %       %Plot and limit spectrum range
     %       simObj.plot(true, [.5 25]);
-    %       
-    %       %Reactivate all components
-    %       simObj.activateAll;
-    %       
+    %
     %
     %    Copyright 2024 Michael J. Prerau Laboratory. - http://www.sleepEEG.org
     % *********************************************************************
@@ -144,6 +151,25 @@ classdef SleepEEGSim < handle
         SO_phase = [];  % Phase of slow oscillations
     end
 
+    properties (Access = private)
+        %Main plot items
+        mainplot_fig = [];
+        history_ax = [];
+        phasehist_ax = [];
+        signal_ax = [];
+        zslider = [];
+        pslider = [];
+        zedit = [];
+        pedit = [];
+
+        %Active figure
+        setactive_fig = []
+
+        %Component figure
+        component_fig = [];
+        comp_ax = [];
+    end
+
     methods
         function obj = SleepEEGSim(varargin)
             %SLEEP_EEG_SIM Constructor for the SleepEEGSim class
@@ -161,7 +187,7 @@ classdef SleepEEGSim < handle
             if nargin == 1 && strcmpi(varargin{1}, 'demo')
                 % If 'demo' is specified, simulate a demo dataset
                 Fs = 128; % Sampling frequency in Hz
-                T = 3600*2; % Duration of simulation in seconds (2 hours)
+                T = 3600; % Duration of simulation in seconds (2 hours)
 
                 % Parameters for fast and slow spindles
                 freq_mean_fast = 14; % Mean frequency of fast spindles
@@ -196,6 +222,7 @@ classdef SleepEEGSim < handle
                 % Run the simulation and plot results
                 simObj.sim(T);
                 simObj.plot;
+                simObj.setActive;
 
                 obj = simObj; % Return the simulated object
                 return;
@@ -641,15 +668,41 @@ classdef SleepEEGSim < handle
                 [t_sp, b, yhat, dylo, dyhi] = obj.fit_ppsplines(obj.t, obj.SO_phase, obj.SpindleSets);
             end
 
-            fh=figure;
-            %Plot simulated signal
-            ax = figdesign(1,1,'orient','landscape','margin',[.1 .1 .05, .33  .03]);
-            set(fh,"Position",[ 0.2948    0.1951    0.5866    0.5979]);
+            if isempty(obj.mainplot_fig) | ~ishandle(obj.mainplot_fig)
+                obj.mainplot_fig=figure;
 
-            ax_split = split_axis(ax,[.7 .1 .1 .1], 1);
+                %Plot simulated signal
+                ax = figdesign(1,1,'orient','landscape','margin',[.1 .1 .05, .33  .03]);
+                set(obj.mainplot_fig,"Position",[ 0.2948    0.1951    0.5866    0.5979]);
 
+                obj.signal_ax = split_axis(ax,[.7 .1 .1 .1], 1);
+                set(obj.signal_ax,'nextplot','replacechildren');
+
+                %Create history and spike histogram axes
+                obj.phasehist_ax = polaraxes('position',[0.7636    0.5732    0.2087    0.3507]);
+                obj.history_ax = axes('Position',[0.7336    0.1    0.2346    0.3415]);
+
+                %Add scroll zoom pan first time
+                addszp = true;
+
+                %Remove figdesign menu
+                delete(findobj(obj.mainplot_fig,'type','uimenu'))
+
+
+                f = uimenu('Label','SleepEEGSim');
+                uimenu(f,'Label','Set Active Components...','Callback',@(src,evnt)obj.setActive);
+                uimenu(f,'Label','Replot','Callback',@(src,evnt)obj.plot);
+                uimenu(f,'Label','Simulate Again','Callback',@(src,evnt)obj.sim);
+                uimenu(f,'Label','Plot Components','Callback',@(src,evnt)obj.plotComponents);
+                uimenu(f,'Label','Plot Spectrum','Callback',@(src,evnt)obj.plotSpect);
+    
+            else
+                figure(obj.mainplot_fig);
+                addszp = false;
+            end
             %Plot spectrogram
-            axes(ax_split(1))
+            axes(obj.signal_ax(1))
+            hold off;
             imagesc(stimes,sfreqs,pow2db(spect));
             axis xy;
             climscale;
@@ -673,8 +726,8 @@ classdef SleepEEGSim < handle
             ylabel('Frequency (Hz)');
             title('Simulated EEG','FontSize',30);
             axis tight
-            linkaxes(ax_split,'x')
-            linkaxes(ax_split([2,3]),'y')
+            linkaxes(obj.signal_ax,'x')
+            linkaxes(obj.signal_ax([2,3]),'y')
 
             %Apply visual filter if needed
             if visual_filter
@@ -684,17 +737,19 @@ classdef SleepEEGSim < handle
             end
 
             %Plot filtered EEG signal
-            axes(ax_split(2))
+            axes(obj.signal_ax(2))
+            hold off;
             plot(obj.t,ts_plot,'k')
 
             set(gca,'xtick',[],'fontsize',15);
             xlabel('Time (s)');
             ylabel('mV');
             pt = prctile(abs(ts_plot),99)+10;
-            ylim(ax_split(2),[-pt pt])
+            ylim(obj.signal_ax(2),[-pt pt])
 
             %Plot spindle components
-            axes(ax_split(3))
+            axes(obj.signal_ax(3))
+            hold off;
             if ~isempty(obj.SpindleSets)
                 hold all
                 for ii = 1:length(obj.SpindleSets)
@@ -704,18 +759,19 @@ classdef SleepEEGSim < handle
                 end
             end
 
-            ylim(ax_split(3),[-pt pt])
+            ylim(obj.signal_ax(3),[-pt pt])
             ylabel('mV');
             set(gca,'xtick',[],'fontsize',15);
 
             %Plot SO and Phase on the same axis
             %SO
-            axes(ax_split(4))
+            axes(obj.signal_ax(4))
+            hold off;
             yyaxis left;
             plot(obj.t,obj.SO_EEG,'linewidth',2);
             ylabel('SO (mV)')
             set(gca,'fontsize',15);
-            ylim(ax_split(4),[-pt pt])
+            ylim(obj.signal_ax(4),[-pt pt])
             set(gca,'fontsize',15);
 
             %Phase
@@ -730,30 +786,33 @@ classdef SleepEEGSim < handle
 
             %Plot the history modulation curves
             if ~isempty(obj.SpindleSets)
-                hist_ax = axes('Position',[  0.7552    0.1290    0.2346    0.3415]);
-                hold on
+                axes(obj.history_ax)
+                leg_str = {};
+                hold off
 
                 for ss = 1:length(obj.SpindleSets)
                     if obj.SpindleSets(ss).isActive
-                        hold on
                         c = exp(b{ss}(1));
-                        fill([t_sp{ss}, fliplr(t_sp{ss})], [yhat{ss} / c - dylo{ss} / c; flipud(yhat{ss} / c + dyhi{ss} / c)],  plot_colors(ss,:), 'FaceAlpha', 0.2, 'EdgeColor', 'none');
-                        plot(t_sp{ss}, yhat{ss} / c,  'color', plot_colors(ss,:), 'linewidth', 2);
 
+                        plot(t_sp{ss}, yhat{ss} / c,  'color', plot_colors(ss,:), 'linewidth', 2);
+                        hold on
                         %Plot true curve dashed
                         obj.SpindleSets(ss).plot_spline('linewidth',1,'linestyle','--','color', plot_colors(ss,:));
-
-                        axis tight;
-                        xlabel('Lag (s)');
-                        ylabel('Modulation');
-
-                        xlabel("Time Since Last Spindle (s)")
-                        ylabel('Modulation Factor')
-
-                        set(hist_ax,'fontsize',15)
+                        fill([t_sp{ss}, fliplr(t_sp{ss})], [yhat{ss} / c - dylo{ss} / c; flipud(yhat{ss} / c + dyhi{ss} / c)],  plot_colors(ss,:), 'FaceAlpha', 0.2, 'EdgeColor', 'none');
+                        sfreq = [num2str(obj.SpindleSets(ss).Freq_mean) 'Hz'];
+                        leg_str = [leg_str(:)' {[sfreq '_{true}'],[sfreq '_{est}'], '95%CI'}];
                     end
                 end
+
+                l = legend('Location','northeast');
+                l.String = leg_str;
+
                 axis tight;
+
+                xlabel("Time Since Last Spindle (s)")
+                ylabel('Modulation Factor')
+
+                set(obj.history_ax,'fontsize',15)
                 ylim([0 min(max(ylim(gca)),10)]);
                 if any([obj.SpindleSets.isActive])
                     title('History Modulation Curve')
@@ -761,8 +820,10 @@ classdef SleepEEGSim < handle
                     title('No Active Spindles')
                 end
 
+                polaraxes(obj.phasehist_ax);
+                hold off;
 
-                h_pax = polaraxes('position',[0.7636    0.5732    0.2087    0.3507]);
+                leg_str = {};
                 %Plot phase histogram
                 for ss = 1:length(obj.SpindleSets)
                     if obj.SpindleSets(ss).isActive
@@ -780,42 +841,57 @@ classdef SleepEEGSim < handle
                         theta_samp(ss) = angle(vect_mean);
 
                         %Plot histogram
-                        h_phist = polarhistogram(obj.SpindleSets(ss).Phase,'Normalization','pdf');
-                        h_pax.ThetaAxisUnits = 'radians';
-                        h_pax.ThetaTick = 0:pi/4:2*pi;
-                        h_pax.ThetaTickLabel = {'0','\pi/4','\pi/2','3\pi/4' '\pm\pi','-3\pi/4', '-\pi/2','-\pi/4'};
-                        h_pax.FontSize = 14;
+                        h_phist(ss) = polarhistogram(obj.SpindleSets(ss).Phase,'Normalization','pdf');
+                        obj.phasehist_ax.ThetaAxisUnits = 'radians';
+                        obj.phasehist_ax.ThetaTick = 0:pi/4:2*pi;
+                        % obj.phasehist_ax.ThetaTickLabel = {'0','\pi/4','\pi/2','3\pi/4' '\pm\pi','-3\pi/4', '-\pi/2','-\pi/4'};
+                        obj.phasehist_ax.FontSize = 15;
 
                         %Add mean arrow
                         hold on
-                        polarplot([theta_mod(ss) theta_mod(ss)],[0 rho_mod(ss)],'linestyle','-','color',plot_colors(ss,:),'linewidth',3);
-                        polarplot([theta_samp(ss) theta_samp(ss)],[0 rho_samp(ss)],'linestyle','--','color',plot_colors(ss,:),'linewidth',2);
+                        pref_model(ss) = polarplot([theta_mod(ss) theta_mod(ss)],[0 rho_mod(ss)],'linestyle','-','color',plot_colors(ss,:),'linewidth',3);
+                        pref_est(ss) = polarplot([theta_samp(ss) theta_samp(ss)],[0 rho_samp(ss)],'linestyle','--','color',plot_colors(ss,:),'linewidth',2);
 
-                        h_phist.FaceColor = plot_colors(ss,:);
-                        h_phist.FaceAlpha = .4;
-                        h_phist.NumBins = 50;
-                        hold on
+                        h_phist(ss).FaceColor = plot_colors(ss,:);
+                        h_phist(ss).FaceAlpha = .4;
+                        h_phist(ss).NumBins = 50;
+
+                        sfreq = [num2str(obj.SpindleSets(ss).Freq_mean) 'Hz'];
+                        leg_str = [leg_str(:)' {[sfreq ' Phase']}, {'\theta_{true}'},{'\theta_{est}'}];
                     end
                 end
+                l = legend('Location',"northeastoutside");
+                l.String = leg_str;
 
                 if any([obj.SpindleSets.isActive])
-                    title(['Theta: ' num2str(theta_mod)])
+                    title('Spindle Phase');
+                    % xlabel(['$\hat{\theta}$_{pref}: ' num2str(theta_mod,3)],'interpreter','latexl'));
                 else
                     title('No Active Spindles')
                 end
             end
 
-            %Add scrollbars and adjust axes
-            axes(ax_split(1))
-            xlim([min(obj.t) max(obj.t)])
+            axes(obj.signal_ax(1));
 
-            [zslider, pslider, zedit, pedit] = scrollzoompan(ax_split(1));
-            mid = mean(xlim);
-            xlim(ax_split(1), mid + [-15 15]);
-            zslider.Value = 30;
-            zedit.String = '30';
-            pslider.Value = mid;
-            pedit.String = mid;
+            if addszp
+                %Add scrollbars and adjust axes
+                axes(obj.signal_ax(1))
+                xlim([min(obj.t) max(obj.t)])
+
+                [obj.zslider, obj.pslider, obj.zedit, obj.pedit, zlabel, plabel] = scrollzoompan(obj.signal_ax(1));
+                obj.pedit.FontSize = 15;
+                obj.zedit.FontSize = 15;
+                zlabel.FontSize = 20;
+                plabel.FontSize = 20;
+            end
+
+            mid = mean(xlim(obj.signal_ax(1)));
+            xlim(obj.signal_ax(1), mid + [-15 15]);
+            obj.zslider.Value = 30;
+            obj.zedit.String = '30';
+            obj.pslider.Value = mid;
+            obj.pedit.String = mid;
+
         end
 
         function [components, names]= getComponents(obj)
@@ -945,7 +1021,7 @@ classdef SleepEEGSim < handle
             %ISACTIVE Shows the activation state of each component
             %
             %   This method sets the isActive properties of the model
-            %   components
+            %   components. Runs interactively with no input
             %
             %   Inputs:
             %       obj: SleepEEGSim object - instance of the SleepEEGSim class
@@ -954,6 +1030,12 @@ classdef SleepEEGSim < handle
             %
             %   Outputs:
             %       isActive: 1 x N A logical vector of activation states
+
+            %Do interactive
+            if nargin == 1 | isempty(isActive)
+                obj.makeSelectTree;
+                return;
+            end
 
             %Check the correct number of components
             assert(length(isActive) == obj.numComponents, ['Number of active components must be ' num2str(obj.numComponents)]);
@@ -1110,29 +1192,136 @@ classdef SleepEEGSim < handle
             [comps, names] = obj.getComponents;
             N = obj.numComponents;
 
-            fh = figure;
-            ax = figdesign(N,1,'type','usletter','orient','landscape','margins',[.05 .1 .1 .025 .03]);
-            set(fh,'Position',[0.0619    0.0861    0.6395    0.8333]);
+            if isempty(obj.component_fig) | ~ishandle(obj.component_fig)
+                obj.component_fig = figure;
+            end
+
+            obj.comp_ax = figdesign(N,1,'type','usletter','orient','landscape','margins',[.05 .1 .1 .025 .03]);
+            set(obj.component_fig,'Position',[0.0619    0.0861    0.6395    0.8333]);
 
 
-            outerlabels(ax,'Time (s)','Components')
+            outerlabels(obj.comp_ax,'Time (s)','Components')
 
             for ii = 1:N
-                axes(ax(ii))
+                axes(obj.comp_ax(ii)) %#ok<*LAXES>
                 plot(obj.t, comps(ii,:))
                 axis tight
                 title(names{ii})
             end
-            linkaxes(ax,'x');
-            set(ax,'fontsize',15)
-            set(ax(1:end-1),'xtick',[]);
+            linkaxes(obj.comp_ax,'x');
+            set(obj.comp_ax,'fontsize',15)
+            set(obj.comp_ax(1:end-1),'xtick',[]);
 
-            scrollzoompan(ax)
+            scrollzoompan(obj.comp_ax)
         end
     end
 
 
-    methods (Access = protected)
+    methods (Access = private)
+        function makeSelectTree(obj)
+            %MAKESELECTTREE Creates a checkbox tree for selecting active
+            %properties
+            %
+            %   This method does interactive isActive toggling
+            %
+            %   Inputs:
+            %       obj: SleepEEGSim object - instance of the SleepEEGSim class
+            %
+
+            %Set up Ui Figure
+            if isempty(obj.setactive_fig) | ~ishandle(obj.setactive_fig)
+                obj.setactive_fig = uifigure('Units','normalized','Position', [0.5   0.6    0.1000    0.5000]);
+                obj.setactive_fig.Units = "pixels";
+                obj.setactive_fig.Name = 'Select Components';
+                obj.setactive_fig.Position(3:4) = [350 450];
+            end
+
+            %Set up checkbox tree
+            cbtree = uitree(obj.setactive_fig,'checkbox');
+            cbtree.Position = [25 80 obj.setactive_fig.Position(3)-50 obj.setactive_fig.Position(4) - 100];
+            cbtree.FontSize = 18;
+            cbtree.CheckedNodesChangedFcn = @obj.updateCheckboxActive;
+
+            btn = uibutton(obj.setactive_fig,'Position', [350/2-50 10 100 50],'Text','Plot',"ButtonPushedFcn",@(src, event)obj.plot);
+
+            %Get component names
+            names = obj.componentNames;
+
+            %Populate tree and name nodes with component names
+            cc = 1;
+            if ~isempty(obj.Aperiodic)
+                n = uitreenode(cbtree,"Text",names{1},"NodeData",cc);
+                if obj.Aperiodic.isActive
+                    checked_nodes(cc) = n;
+                    cc = cc+1;
+                end
+            end
+
+            if ~isempty(obj.Slow_Waves)
+                n = uitreenode(cbtree,"Text",names{2},"NodeData",cc);
+                if obj.Slow_Waves.isActive
+                    checked_nodes(cc) = n;
+                    cc = cc+1;
+                end
+            end
+
+            if ~isempty(obj.BandSets)
+                bb_check = uitreenode(cbtree,"Text",'EEG Bands',"NodeData",[]);
+                for ii = 1:length(obj.BandSets)
+                    band = obj.BandSets(ii);
+                    n = uitreenode(bb_check,"Text",names{2+ii},"NodeData",cc);
+                    if band.isActive
+                        checked_nodes(cc) = n;
+                        cc = cc+1;
+                    end
+                end
+            end
+
+            if ~isempty(obj.SpindleSets)
+                sp_check = uitreenode(cbtree,"Text",'Spindles',"NodeData",[]);
+                for ii = 1:length(obj.SpindleSets)
+                    spindle = obj.SpindleSets(ii);
+                    n = uitreenode(sp_check,"Text",names{2 + length(obj.BandSets) + ii},"NodeData",cc);
+                    if spindle.isActive
+                        checked_nodes(cc) = n;
+                        cc = cc+1;
+                    end
+                end
+            end
+
+            if ~isempty(obj.LineNoiseSets)
+                ln_check = uitreenode(cbtree,"Text",'Line Noise',"NodeData",[]);
+                for ii = 1:length(obj.LineNoiseSets)
+                    ln = obj.LineNoiseSets(ii);
+                    n = uitreenode(ln_check,"Text",names{2 + length(obj.BandSets) + length(obj.SpindleSets) + ii},"NodeData",cc);
+                    if ln.isActive
+                        checked_nodes(cc) = n;
+                        cc = cc+1;
+                    end
+                end
+            end
+
+            if ~isempty(obj.Artifacts)
+                n = uitreenode(cbtree,"Text",names{2 + length(obj.BandSets) + length(obj.SpindleSets) + length(obj.LineNoiseSets) + 1},"NodeData",cc);
+                if obj.Artifacts.isActive
+                    checked_nodes(cc) = n;
+                end
+            end
+
+            %Set the active nodes to be checked
+            cbtree.CheckedNodes = checked_nodes;
+
+            %Expand the tree
+            expand(cbtree);
+        end
+
+        function updateCheckboxActive(obj,cbtree,~)
+            %Callback for checkbox tree
+            names = obj.componentNames;
+            %Set active nodes to checked nodes
+            obj.setActive(ismember(names,{cbtree.CheckedNodes.Text}));
+        end
+
         function [SO_phase, SO_EEG] = computeSOPhase(obj, baseline_signal)
             %COMPUTESOPHASE Compute the Slow Oscillation (SO) phase and signal
             %
