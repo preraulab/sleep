@@ -14,7 +14,7 @@ classdef SleepEEGSim < handle
     %       Fs: double - Sampling frequency in Hz (Default: 128)
     %       Aperiodic: AperiodicEEG object - Component for aperiodic EEG noise
     %       Slow_Waves: SlowWaves object - Component for slow wave activity
-    %       BandSets: array of BandEEG objects - Sets of frequency bands
+    %       OscillatorSets: array of Oscillator objects - Sets of frequency bands
     %       SpindleSets: array of Spindles objects - Sets of spindles
     %       LineNoiseSets: array of LineNoise objects - Sets of line noise
     %       Artifacts: MotionArtifacts object - Component for motion artifacts
@@ -58,18 +58,18 @@ classdef SleepEEGSim < handle
     %
     %       % Define control points and spline parameters
     %       ctrl_pts_fast = [ -3, 0, 3, 4.5, 8, 9, 12, 15, 18, 45, 50, 55, 65, 85 ];
-    %       theta_spline_fast = log([ 1e-5, 1e-2, 1, 2, 1, 1, 1, 1, 1, 1, 1.5, 1, 1, 1 ]);
+    %       theta_spline_fast = [ 1e-5, 1e-2, 1, 2, 1, 1, 1, 1, 1, 1, 1.5, 1, 1, 1 ];
     %       ctrl_pts_slow = [ -3, 0, 4, 6, 8, 9, 12, 15, 18, 40, 45, 55, 65, 85 ];
-    %       theta_spline_slow = log([ 1e-5, 1e-2, 1, 3, 1, 1, 1, 1, 1, 1, 1.2, 1, 1, 1 ]);
+    %       theta_spline_slow = [ 1e-5, 1e-2, 1, 3, 1, 1, 1, 1, 1, 1, 1.2, 1, 1, 1 ];
     %
     %       fast_spindles = Spindles('Freq_mean', freq_mean_fast, 'Phase_pref', phase_pref_fast, 'Ctrl_pts', ctrl_pts_fast, 'Theta_spline', theta_spline_fast);
     %       slow_spindles = Spindles('Freq_mean', freq_mean_slow, 'Phase_pref', phase_pref_slow, 'Ctrl_pts', ctrl_pts_slow, 'Theta_spline', theta_spline_slow);
     %
     %       %-------------------------
-    %       % Create BandEEG objects
+    %       % Create Oscillator objects
     %       %-------------------------
-    %       slow_power = BandEEG([1 1.5], 10);
-    %       delta_power = BandEEG([1 5], 15);
+    %       slow_power = Oscillator([1 1.5], 10);
+    %       delta_power = Oscillator([1 5], 15);
     %
     %       %-------------------------
     %       % Create LineNoise objects
@@ -140,7 +140,7 @@ classdef SleepEEGSim < handle
         Fs = 128;  % Sampling frequency in Hz
         Aperiodic = [];  % Aperiodic EEG noise component
         Slow_Waves = [];  % Slow wave activity component
-        BandSets = [];  % Array of frequency band components
+        OscillatorSets = [];  % Array of frequency band components
         SpindleSets = [];  % Array of spindle components
         LineNoiseSets = [];  % Array of line noise components
         Artifacts = [];  % Motion artifacts component
@@ -198,10 +198,10 @@ classdef SleepEEGSim < handle
 
                 % Define control points and spline parameters for fast and slow spindles
                 ctrl_pts_fast = [ -3, 0, 3, 4.5, 8, 9, 12, 15, 18  45, 50, 55, 65, 85 ];
-                theta_spline_fast = log([ 1e-5, 1e-2, 1, 2, 1, 1, 1, 1, 1, 1, 1.5, 1, 1, 1 ]);
+                theta_spline_fast = [ 1e-5, 1e-2, 1, 2, 1, 1, 1, 1, 1, 1, 1.5, 1, 1, 1 ];
 
                 ctrl_pts_slow = [ -3, 0, 4, 6, 8, 9, 12, 15, 18  40, 45, 55, 65, 85 ];
-                theta_spline_slow = log([ 1e-5, 1e-2, 1, 3, 1, 1, 1, 1, 1, 1, 1.2, 1, 1, 1 ]);
+                theta_spline_slow = [ 1e-5, 1e-2, 1, 3, 1, 1, 1, 1, 1, 1, 1.2, 1, 1, 1 ];
 
                 % Create Spindles objects for fast and slow spindles
                 fast_spindles = Spindles('Freq_mean', freq_mean_fast, 'Phase_pref', phase_pref_fast, 'Ctrl_pts', ctrl_pts_fast, 'Theta_spline', theta_spline_fast);
@@ -215,6 +215,7 @@ classdef SleepEEGSim < handle
                 simObj.addSlowWaves;
                 simObj.addSpindles(fast_spindles);
                 simObj.addSpindles(slow_spindles);
+                simObj.addOscillator;
                 simObj.addLineNoise(LineNoise('sin', 60, 15));
                 simObj.addLineNoise(LineNoise('sawtooth', 18, 10));
                 simObj.addArtifacts;
@@ -313,29 +314,29 @@ classdef SleepEEGSim < handle
             end
         end
 
-        function obj = addBand(obj, bb)
-            %ADDBAND Add band-specific EEG components to the simulation
+        function obj = addOscillator(obj, oo)
+            %ADDOSCILLATOR Add Noisy OscillatorEEG components to the simulation
             %
-            %   This method adds a BandEEG object to the simulation. If no object is
-            %   provided, a default BandEEG object is created.
+            %   This method adds a Oscillator object to the simulation. If no object is
+            %   provided, a default Oscillator object is created.
             %
             %   Inputs:
-            %       bb: Optional BandEEG object. If not provided, a default object is used.
+            %       oo: Optional Oscillator object. If not provided, a default object is used.
             %   Outputs:
             %       obj: Updated SleepEEGSim object with the band-specific component added.
 
             if nargin == 1
-                bb = BandEEG; % Create default BandEEG object
+                oo = Oscillator; % Create default Oscillator object
             end
 
-            % Check if bb is an instance of BandEEG
-            assert(isa(bb, 'BandEEG'), 'Must be an object of class BandEEG');
+            % Check if bb is an instance of Oscillator
+            assert(isa(oo, 'Oscillator'), 'Must be an object of class Oscillator');
 
             % Add the band EEG object to the list of band-specific components
-            if isempty(obj.BandSets)
-                obj.BandSets = bb;
+            if isempty(obj.OscillatorSets)
+                obj.OscillatorSets = oo;
             else
-                obj.BandSets(end+1) = bb;
+                obj.OscillatorSets(end+1) = oo;
             end
         end
 
@@ -434,10 +435,10 @@ classdef SleepEEGSim < handle
                 SO_signal = SO_signal + obj.Slow_Waves.Signal;
             end
 
-            if ~isempty(obj.BandSets)
-                for ii = 1:length(obj.BandSets)
-                    obj.BandSets(ii).sim(obj.t);
-                    SO_signal = SO_signal + obj.BandSets(ii).Signal;
+            if ~isempty(obj.OscillatorSets)
+                for ii = 1:length(obj.OscillatorSets)
+                    obj.OscillatorSets(ii).sim(obj.t);
+                    SO_signal = SO_signal + obj.OscillatorSets(ii).Signal;
                 end
             end
 
@@ -465,7 +466,7 @@ classdef SleepEEGSim < handle
             %
             %   This method deactivates all components of the SleepEEGSim object by setting
             %   their 'isActive' property to false. This includes Aperiodic, Slow_Waves,
-            %   Artifacts, BandSets, SpindleSets, and LineNoiseSets.
+            %   Artifacts, OscillatorSets, SpindleSets, and LineNoiseSets.
             %
             %   Inputs:
             %       obj: SleepEEGSim object - instance of the SleepEEGSim class
@@ -477,8 +478,8 @@ classdef SleepEEGSim < handle
             obj.Slow_Waves.isActive = false;
             obj.Artifacts.isActive = false;
 
-            for ii = 1:length(obj.BandSets)
-                obj.BandSets(ii).isActive = false;
+            for ii = 1:length(obj.OscillatorSets)
+                obj.OscillatorSets(ii).isActive = false;
             end
 
             for ii = 1:length(obj.SpindleSets)
@@ -495,7 +496,7 @@ classdef SleepEEGSim < handle
             %
             %   This method activates all components of the SleepEEGSim object by setting
             %   their 'isActive' property to true. This includes Aperiodic, Slow_Waves,
-            %   Artifacts, BandSets, SpindleSets, and LineNoiseSets.
+            %   Artifacts, OscillatorSets, SpindleSets, and LineNoiseSets.
             %
             %   Inputs:
             %       obj: SleepEEGSim object - instance of the SleepEEGSim class
@@ -508,8 +509,8 @@ classdef SleepEEGSim < handle
             obj.Slow_Waves.isActive = true;
             obj.Artifacts.isActive = true;
 
-            for ii = 1:length(obj.BandSets)
-                obj.BandSets(ii).isActive = true;
+            for ii = 1:length(obj.OscillatorSets)
+                obj.OscillatorSets(ii).isActive = true;
             end
 
             for ii = 1:length(obj.SpindleSets)
@@ -553,9 +554,9 @@ classdef SleepEEGSim < handle
                 signal = signal + obj.Artifacts.Signal;
             end
 
-            for ii = 1:length(obj.BandSets)
-                if obj.BandSets(ii).isActive
-                    signal = signal + obj.BandSets(ii).Signal;
+            for ii = 1:length(obj.OscillatorSets)
+                if obj.OscillatorSets(ii).isActive
+                    signal = signal + obj.OscillatorSets(ii).Signal;
                 end
             end
 
@@ -930,9 +931,9 @@ classdef SleepEEGSim < handle
                 cc = cc + 1;
             end
 
-            if ~isempty(obj.BandSets)
-                for ii = 1:length(obj.BandSets)
-                    band = obj.BandSets(ii);
+            if ~isempty(obj.OscillatorSets)
+                for ii = 1:length(obj.OscillatorSets)
+                    band = obj.OscillatorSets(ii);
                     components(cc,:) = band.Signal;
                     cc = cc + 1;
                 end
@@ -988,9 +989,9 @@ classdef SleepEEGSim < handle
                 cc = cc+1;
             end
 
-            if ~isempty(obj.BandSets)
-                for ii = 1:length(obj.BandSets)
-                    band = obj.BandSets(ii);
+            if ~isempty(obj.OscillatorSets)
+                for ii = 1:length(obj.OscillatorSets)
+                    band = obj.OscillatorSets(ii);
                     isActive(cc) =  band.isActive;
                     cc = cc+1;
                 end
@@ -1052,9 +1053,9 @@ classdef SleepEEGSim < handle
             end
 
 
-            if ~isempty(obj.BandSets)
-                for ii = 1:length(obj.BandSets)
-                    band = obj.BandSets(ii);
+            if ~isempty(obj.OscillatorSets)
+                for ii = 1:length(obj.OscillatorSets)
+                    band = obj.OscillatorSets(ii);
                     band.isActive = isActive(cc);
                     cc = cc+1;
                 end
@@ -1106,8 +1107,8 @@ classdef SleepEEGSim < handle
                 N = N+1;
             end
 
-            if ~isempty(obj.BandSets)
-                N = N + length(obj.BandSets);
+            if ~isempty(obj.OscillatorSets)
+                N = N + length(obj.OscillatorSets);
             end
 
             if ~isempty(obj.SpindleSets)
@@ -1145,10 +1146,10 @@ classdef SleepEEGSim < handle
                 component_names{end+1} = 'Slow Waves';
             end
 
-            if ~isempty(obj.BandSets)
-                for ii = 1:length(obj.BandSets)
-                    band = obj.BandSets(ii);
-                    component_names{end+1} = ['BandSet ' num2str(band.FrequencyRange(1)) '-' num2str(band.FrequencyRange(2))];
+            if ~isempty(obj.OscillatorSets)
+                for ii = 1:length(obj.OscillatorSets)
+                    osc = obj.OscillatorSets(ii);
+                    component_names{end+1} = ['OscillatorSet ' num2str(osc.Frequency)];
                 end
             end
 
@@ -1265,12 +1266,12 @@ classdef SleepEEGSim < handle
                 end
             end
 
-            if ~isempty(obj.BandSets)
+            if ~isempty(obj.OscillatorSets)
                 bb_check = uitreenode(cbtree,"Text",'EEG Bands',"NodeData",[]);
-                for ii = 1:length(obj.BandSets)
-                    band = obj.BandSets(ii);
+                for ii = 1:length(obj.OscillatorSets)
+                    osc = obj.OscillatorSets(ii);
                     n = uitreenode(bb_check,"Text",names{2+ii},"NodeData",cc);
-                    if band.isActive
+                    if osc.isActive
                         checked_nodes(cc) = n;
                         cc = cc+1;
                     end
@@ -1281,7 +1282,7 @@ classdef SleepEEGSim < handle
                 sp_check = uitreenode(cbtree,"Text",'Spindles',"NodeData",[]);
                 for ii = 1:length(obj.SpindleSets)
                     spindle = obj.SpindleSets(ii);
-                    n = uitreenode(sp_check,"Text",names{2 + length(obj.BandSets) + ii},"NodeData",cc);
+                    n = uitreenode(sp_check,"Text",names{2 + length(obj.OscillatorSets) + ii},"NodeData",cc);
                     if spindle.isActive
                         checked_nodes(cc) = n;
                         cc = cc+1;
@@ -1293,7 +1294,7 @@ classdef SleepEEGSim < handle
                 ln_check = uitreenode(cbtree,"Text",'Line Noise',"NodeData",[]);
                 for ii = 1:length(obj.LineNoiseSets)
                     ln = obj.LineNoiseSets(ii);
-                    n = uitreenode(ln_check,"Text",names{2 + length(obj.BandSets) + length(obj.SpindleSets) + ii},"NodeData",cc);
+                    n = uitreenode(ln_check,"Text",names{2 + length(obj.OscillatorSets) + length(obj.SpindleSets) + ii},"NodeData",cc);
                     if ln.isActive
                         checked_nodes(cc) = n;
                         cc = cc+1;
@@ -1302,7 +1303,7 @@ classdef SleepEEGSim < handle
             end
 
             if ~isempty(obj.Artifacts)
-                n = uitreenode(cbtree,"Text",names{2 + length(obj.BandSets) + length(obj.SpindleSets) + length(obj.LineNoiseSets) + 1},"NodeData",cc);
+                n = uitreenode(cbtree,"Text",names{2 + length(obj.OscillatorSets) + length(obj.SpindleSets) + length(obj.LineNoiseSets) + 1},"NodeData",cc);
                 if obj.Artifacts.isActive
                     checked_nodes(cc) = n;
                 end

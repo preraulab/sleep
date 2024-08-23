@@ -16,7 +16,7 @@ classdef Spindles < handle
     %       Phase_pref: double - Preferred phase angle of the spindle, in radians. (Default: 0)
     %       Modulation_factor: double - Modulation factor for cosine tuning. (Default: 0.6)
     %       Ctrl_pts: double vector - Control points for spline fitting. (Default: [-3, 0, 3, 5, 8, 9, 12, 15, 18, 45, 50, 55, 65, 85])
-    %       Theta_spline: double vector - Theta values for spline fitting. (Default: log([1e-5, 1e-2, 1, 2, 1, 1, 1, 1, 1, 1, 1.5, 1, 1, 1]))
+    %       Theta_spline: double vector - Desired multiplier values for at each control point. (Default: [1e-5, 1e-2, 1, 2, 1, 1, 1, 1, 1, 1, 1.5, 1, 1, 1])
     %       Spline_tmax: double - Maximum time for spline fitting, in seconds. (Default: 60)
     %       Tension: double - Tension parameter for spline fitting. (Default: 1)
     %       Fs_sp: double - Downsampling rate for spline fitting. (Default: 50)
@@ -53,7 +53,7 @@ classdef Spindles < handle
         Phase_pref double {mustBeReal, mustBeNumeric, mustBeNonempty} = 0
         Modulation_factor double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 0.6
         Ctrl_pts double {mustBeReal, mustBeNumeric, mustBeNonempty, mustBeVector} =         [    -3,     0, 3, 5, 8, 9, 12, 15, 18  45,  50, 55, 65, 85]
-        Theta_spline double {mustBeReal, mustBeNumeric, mustBeNonempty, mustBeVector} = log([  1e-5,  1e-2, 1, 2, 1, 1,  1,  1,  1,  1, 1.5, 1,  1,  1])
+        Theta_spline double {mustBeReal, mustBeNumeric, mustBeNonempty, mustBeVector} =     [  1e-5,  1e-2, 1, 2, 1, 1,  1,  1,  1,  1, 1.5, 1,  1,  1]
         Spline_tmax double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 60
         Tension double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 1
         Fs_sp double {mustBePositive, mustBeReal, mustBeNumeric, mustBeNonempty} = 50
@@ -244,15 +244,78 @@ classdef Spindles < handle
             %       obj.plot_spline('r--');
 
             if ~isempty(obj.S)
-                plot(obj.t_spline, exp(obj.S' * obj.Theta_spline'), varargin{:})
-                xlabel('Time (s)')
-                ylabel('Multiplier')
+                obj.genS;
             end
+
+            if nargin>1 & ishandle(varargin{1}) & (isa(varargin{1},'matlab.ui.control.UIAxes') | isa(varargin{1},'matlab.graphics.axis.Axes'))
+                ax = varargin{1};
+                varargin = {varargin{2:end}};
+            else
+                ax = gca;
+            end
+
+            obj.genS;
+
+            plot(ax, obj.t_spline, exp(obj.S' * log(obj.Theta_spline)'), varargin{:})
+            xlabel(ax,'Time (s)')
+            ylabel(ax,'Multiplier')
+
+        end
+
+        function obj = genS(obj)
+            % Convert time to bins
+            spline_tmax = obj.Spline_tmax * obj.Fs_sp;
+            ctrl_pts = obj.Ctrl_pts * obj.Fs_sp;
+
+
+            numknots = length(ctrl_pts);
+
+            % Construct spline matrix
+            obj.S = zeros(spline_tmax, numknots);
+
+            if any(obj.Theta_spline)
+                for i = 1:spline_tmax
+                    % Find the nearest control point indices
+                    nearest_c_pt_index = find(ctrl_pts < i, 1, 'last');
+
+                    % Boundary checks for control points
+                    if nearest_c_pt_index < 2 || nearest_c_pt_index > numknots - 2
+                        continue;
+                    end
+
+                    nearest_c_pt_time = ctrl_pts(nearest_c_pt_index);
+                    next_c_pt_time = ctrl_pts(nearest_c_pt_index + 1);
+                    prev_c_pt_time = ctrl_pts(nearest_c_pt_index - 1);
+                    next2 = ctrl_pts(nearest_c_pt_index + 2);
+
+                    % Compute the normalized parameter u
+                    u = (i - nearest_c_pt_time) / (next_c_pt_time - nearest_c_pt_time);
+
+                    % Calculate the lengths for tension parameter l1 and l2
+                    l1 = (next_c_pt_time - prev_c_pt_time) / (next_c_pt_time - nearest_c_pt_time);
+                    l2 = (next2 - nearest_c_pt_time) / (next_c_pt_time - nearest_c_pt_time);
+
+                    % Calculate spline coefficients p
+                    p = [u^3, u^2, u, 1] * [-obj.Tension / l1, 2 - obj.Tension / l2, obj.Tension / l1 - 2, obj.Tension / l2;
+                        2 * obj.Tension / l1, obj.Tension / l2 - 3, 3 - 2 * obj.Tension / l1, -obj.Tension / l2;
+                        -obj.Tension / l1, 0, obj.Tension / l1, 0;
+                        0, 1, 0, 0];
+
+                    % Assign the spline coefficients to the spline matrix S
+                    obj.S(i, nearest_c_pt_index - 1:nearest_c_pt_index + 2) = p;
+                end
+            end
+
+            % Transpose the spline matrix to optimize for the loop
+            obj.S = obj.S';
+            obj.t_spline = (0:spline_tmax-1) / obj.Fs_sp;
         end
 
     end
 
     methods (Static, Access = private)
+
+
         function [times, train, S, t_spline] = gen_ppspline_times(Fs, Fs_sp, baseline_rate, phase, coupling_mag, phase_pref, ctrl_pts, theta_spline, tension, spline_tmax)
             %GEN_PPSPLINE_TIMES Generate point process spindle times and train using phase and spline parameters
             %
@@ -362,7 +425,7 @@ classdef Spindles < handle
                 seg = train(i - 1:-1:i - spline_tmax);
 
                 % Calculate the firing rate lambda
-                lambda(i) = exp(theta_spline * (S * seg) + phase_lambda(i) + log(baseline_rate));
+                lambda(i) = exp(log(theta_spline) * (S * seg) + phase_lambda(i) + log(baseline_rate));
 
                 % Generate the spike train
                 train(i) = min(poissrnd(lambda(i) / Fs_sp), 1);
