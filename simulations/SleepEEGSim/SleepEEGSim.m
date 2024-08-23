@@ -215,7 +215,7 @@ classdef SleepEEGSim < handle
                 simObj.addSlowWaves;
                 simObj.addSpindles(fast_spindles);
                 simObj.addSpindles(slow_spindles);
-                simObj.addOscillator;
+                simObj.addOscillator(Oscillator('Frequency', 5, 'sig2state', 6)); %Added delta power
                 simObj.addLineNoise(LineNoise('sin', 60, 15));
                 simObj.addLineNoise(LineNoise('sawtooth', 18, 10));
                 simObj.addArtifacts;
