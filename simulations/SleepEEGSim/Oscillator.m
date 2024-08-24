@@ -12,9 +12,12 @@ classdef Oscillator < handle
     %           (Default: 8)
     %       sig2state: double - Amplitude of the state noise (Default: 0.1)
     %       sig2obs: double - Amplitude of the observation noise (Default: 0.1)
-    %       rho: double - Damping parameter (Default: 0.9)
+    %       rho: double - Damping parameter (Default: 0.9) 
     %       m: double - Amplitude multiplier (Default: 1)
     %       isActive: logical - Flag to indicate if the object is active (Default: true)
+    %
+    %   NOTE: Set rho to 1 and sig2state and sig2obs to 0 to generate a
+    %   pure sin wave
     %
     %   Properties:
     %       Frequency: double vector - Frequency range for band power [Hz]
@@ -31,8 +34,8 @@ classdef Oscillator < handle
 
     properties
         Frequency double {mustBeReal, mustBeVector, mustBeNonempty} = 8; % Frequency range for band power [Hz]
-        sig2state double {mustBePositive, mustBeReal, mustBeNonempty} = 15; % Amplitude of state noise
-        sig2obs double {mustBePositive, mustBeReal, mustBeNonempty} = 0.1; % Amplitude of observation noise
+        sig2state double {mustBeNonnegative, mustBeReal, mustBeNonempty} = 15; % Amplitude of state noise
+        sig2obs double {mustBeNonnegative, mustBeReal, mustBeNonempty} = 0.1; % Amplitude of observation noise
         rho double {mustBePositive, mustBeReal, mustBeNonempty} = 0.9; % Autoregressive parameter
         m double {mustBePositive, mustBeReal, mustBeNonempty} = 1; % Autoregressive parameter
 
@@ -112,10 +115,7 @@ classdef Oscillator < handle
             %       title('Simulated Noisy Oscillatory Data');
             %       xlabel('Time (s)');
             %       ylabel('Observation');
-            %
-            %   Copyright 2023 Michael J. Prerau Laboratory. - http://www.sleepEEG.org
-            %% ********************************************************************
-
+           
             % Calculate angular frequency and state transition matrix F
             w = 2 * pi * freq / Fs;  % Angular frequency
             F = rho * [cos(w) -sin(w); sin(w) cos(w)];
@@ -129,7 +129,7 @@ classdef Oscillator < handle
             y = zeros(1, T);       % Observations (1D observation, T time points)
 
             % Initial state at t=0, sampled from the state noise distribution
-            x(:, 1) = randn(2,1) * s2state;
+            x(:, 1) = randn(2,1);
 
             % Simulation of the state-space model over time
             for ii = 2:T + 1
