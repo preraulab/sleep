@@ -2,43 +2,42 @@ classdef Oscillator < handle
     %OSCILLATOR  Create an noisy oscillator object with specified properties.
     %
     %   The Oscillator class simulates noisy oscillator with a specific
-    %   frequency, state noise, observation noise, and autoregressive parameter.
+    %   Freq, state noise, observation noise, and autoregressive parameter.
     %
     %   Usage:
     %       obj = Oscillator('PropertyName', PropertyValue, ...)
     %
     %   Inputs (name-value pairs):
-    %       Frequency: double vector - Frequency range for band power [Hz]
-    %           (Default: 8)
-    %       sig2state: double - Amplitude of the state noise (Default: 0.1)
-    %       sig2obs: double - Amplitude of the observation noise (Default: 0.1)
-    %       rho: double - Damping parameter (Default: 0.9) 
-    %       m: double - Amplitude multiplier (Default: 1)
+    %       Freq: double vector - Frequency for oscillator[Hz] (Default: 8)
+    %       StateNoise: double - Amplitude of the state noise (Default: 0.1)
+    %       ObsNoise: double - Amplitude of the observation noise (Default: 0.1)
+    %       DampingFactor: double - Autoregressive damping factor (Default: 0.99)
+    %       AmpMult: double - Amplitude multiplier (Default: 1)
     %       isActive: logical - Flag to indicate if the object is active (Default: true)
     %
     %   NOTE: Set rho to 1 and sig2state and sig2obs to 0 to generate a
     %   pure sin wave
     %
     %   Properties:
-    %       Frequency: double vector - Frequency range for band power [Hz]
-    %       sig2state: double - Amplitude of the state noise
-    %       sig2obs: double - Amplitude of the observation noise
-    %       rho: double - Autoregressive parameter
+    %       Freq: double vector - Freq center for oscillator [Hz]
+    %       StateNoise: double - Amplitude of the state noise
+    %       ObsNoise: double - Amplitude of the observation noise
+    %       DampingFactor: double - Autoregressive parameter
+    %       AmpMult: double - Amplitude multiplier
     %       Signal: double vector - Stored simulated noise signal
     %       isActive: logical - Flag to indicate if the object is active
     %
     %   Example:
-    %       osc = Oscillator('Frequency', 10, 'sig2state', 0.05);
-    %       disp(osc.Frequency);
+    %       osc = Oscillator('Freq', 10, 'StateNoise', 0.05);
+    %       disp(osc.Freq);
     %
 
     properties
-        Frequency double {mustBeReal, mustBeVector, mustBeNonempty} = 8; % Frequency range for band power [Hz]
-        sig2state double {mustBeNonnegative, mustBeReal, mustBeNonempty} = 15; % Amplitude of state noise
-        sig2obs double {mustBeNonnegative, mustBeReal, mustBeNonempty} = 0.1; % Amplitude of observation noise
-        rho double {mustBePositive, mustBeReal, mustBeNonempty} = 0.9; % Autoregressive parameter
-        m double {mustBePositive, mustBeReal, mustBeNonempty} = 1; % Autoregressive parameter
-
+        Freq double {mustBeReal, mustBeVector, mustBeNonempty} = 8; % Freq range for band power [Hz]
+        StateNoise double {mustBeNonnegative, mustBeReal, mustBeNonempty} = 15; % Amplitude of state noise
+        ObsNoise double {mustBeNonnegative, mustBeReal, mustBeNonempty} = 0.1; % Amplitude of observation noise
+        DampingFactor double {mustBePositive, mustBeReal, mustBeNonempty} = 0.99; % Autoregressive parameter
+        AmpMult double {mustBePositive, mustBeReal, mustBeNonempty} = 1; % Autoregressive parameter
 
         Signal double = []; % Stored simulated noise signal
         isActive logical = true; % Flag to indicate if the object is active
@@ -52,39 +51,39 @@ classdef Oscillator < handle
             %       obj = Oscillator('PropertyName', PropertyValue, ...)
             %
             %   Inputs (name-value pairs):
-            %       Frequency: double vector - Frequency range for band power [Hz]
+            %       Freq: double vector - Freq range for band power [Hz]
             %           (Default: 8)
             %       sig2state: double - Amplitude of the state noise (Default: 0.1)
             %       sig2obs: double - Amplitude of the observation noise (Default: 0.1)
-            %       rho: double - Damping parameter (Default: 0.9)
+            %       rho: double - Damping parameter (Default: 0.99)
             %       isActive: logical - Flag to indicate if the object is active (Default: true)
 
             % Create an input parser object
             p = inputParser;
 
             % Define the parameters and their default values
-            addParameter(p, 'Frequency', obj.Frequency, @(x) validateattributes(x, {'numeric'}, {'vector', 'nonempty'}));
-            addParameter(p, 'sig2state', obj.sig2state, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
-            addParameter(p, 'sig2obs', obj.sig2obs, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
-            addParameter(p, 'rho', obj.rho, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
-            addParameter(p, 'm', obj.rho, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
+            addParameter(p, 'Freq', obj.Freq, @(x) validateattributes(x, {'numeric'}, {'vector', 'nonempty'}));
+            addParameter(p, 'StateNoise', obj.StateNoise, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
+            addParameter(p, 'ObsNoise', obj.ObsNoise, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
+            addParameter(p, 'DampingFactor', obj.DampingFactor, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
+            addParameter(p, 'AmpMult', obj.AmpMult, @(x) validateattributes(x, {'numeric'}, {'scalar', 'positive'}));
             addParameter(p, 'isActive', obj.isActive, @(x) islogical(x) && isscalar(x));
 
             % Parse the inputs
             parse(p, varargin{:});
 
             % Assign parsed values to object properties
-            obj.Frequency = p.Results.Frequency;
-            obj.sig2state = p.Results.sig2state;
-            obj.sig2obs = p.Results.sig2obs;
-            obj.rho = p.Results.rho;
-            obj.m = p.Results.m;
+            obj.Freq = p.Results.Freq;
+            obj.StateNoise = p.Results.StateNoise;
+            obj.ObsNoise = p.Results.ObsNoise;
+            obj.DampingFactor = p.Results.DampingFactor;
+            obj.AmpMult = p.Results.AmpMult;
             obj.isActive = p.Results.isActive;
         end
 
         function oscillation = sim(obj, t)
             Fs = 1/(t(2)-t(1));
-            oscillation = obj.genNoisyOscillator(t, Fs, obj.Frequency, obj.m, obj.rho, obj.sig2state, obj.sig2obs);
+            oscillation = obj.genNoisyOscillator(t, Fs, obj.Freq, obj.AmpMult, obj.DampingFactor, obj.StateNoise, obj.ObsNoise);
             obj.Signal = oscillation;
         end
     end
@@ -98,8 +97,8 @@ classdef Oscillator < handle
             %
             %   Input:
             %       Duration: double - Duration of the simulation in seconds.
-            %       Fs: double - Sampling frequency in Hz.
-            %       freq: double - Frequency of the oscillation in Hz.
+            %       Fs: double - Sampling Freq in Hz.
+            %       freq: double - Freq of the oscillation in Hz.
             %       rho: double - Damping parameter (Default: 0.9)
             %       m: double - Amplitude multiplier parameter (Default: 1)
             %       sig2state: double - Variance of the state noise.
@@ -116,8 +115,8 @@ classdef Oscillator < handle
             %       xlabel('Time (s)');
             %       ylabel('Observation');
            
-            % Calculate angular frequency and state transition matrix F
-            w = 2 * pi * freq / Fs;  % Angular frequency
+            % Calculate angular Freq and state transition matrix F
+            w = 2 * pi * freq / Fs;  % Angular Freq
             F = rho * [cos(w) -sin(w); sin(w) cos(w)];
             G = [1 0];
 
