@@ -41,7 +41,7 @@ function [staging, annotations] = read_staging(varargin)
     addRequired(p, 'time_col', @(x) isnumeric(x) && isscalar(x) && x>0 && mod(x,1)==0);
     addRequired(p, 'stage_col', @(x) isnumeric(x) && isscalar(x) && x>0 && mod(x,1)==0);
 
-    addOptional(p, 'stage_vals', default_stage_vals, @(x) iscell(x) && numel(x)==7);
+    addOptional(p, 'stage_vals', default_stage_vals, @(x) isempty(x) || (iscell(x) && numel(x)==7));
     addOptional(p, 'header_lines', 0, @(x) isnumeric(x) && isscalar(x) && x>=0);
     addOptional(p, 'start_time', NaN, @(x) ischar(x) || isstring(x) || isnan(x));
     addOptional(p, 'epoch_dur', 30, @(x) isnumeric(x) && isscalar(x) && x>0);
@@ -57,6 +57,10 @@ function [staging, annotations] = read_staging(varargin)
     start_time  = p.Results.start_time;
     epoch_dur   = p.Results.epoch_dur;
     plot_on     = p.Results.plot_on;
+
+    if isempty(stage_vals)
+        stage_vals = default_stage_vals;
+    end
 
     % ---------------- Validate stage_vals ----------------
     if iscell(stage_vals) && numel(stage_vals)==7 && ~iscell(stage_vals{1})
@@ -156,7 +160,7 @@ function times_seconds = convert_time_to_seconds(time_data, start_time, epoch_du
     if isempty(first_valid)
         error('Dimension mismatch. Check for header lines to remove');
     end
-    
+
     times_seconds = raw_seconds - first_valid;
 end
 
