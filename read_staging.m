@@ -1,39 +1,28 @@
-function [staging, annotations] = read_staging(file_name, time_col, stage_col, stage_vals, header_lines, start_time, epoch_dur, plot_on)
+function [staging, annotations] = read_staging(varargin)
 %READ_STAGING  Read sleep staging data from a CSV file
 %
 %   Usage:
-%       [staging, annotations] = read_staging(file_name, time_col, stage_col, stage_vals, header_lines, start_time, epoch_dur, plot_on)
+%       [staging, annotations] = read_staging(file_name, time_col, stage_col, 'Name', Value, ...)
 %
-%   Input:
+%   Inputs:
 %       file_name   : string - path to CSV file -- required
 %       time_col    : integer - column number for time data (1-based) -- required
 %       stage_col   : integer - column number for stage data (1-based) -- required
-%       stage_vals  : 1x7 cell array of strings or cell arrays with stage strings (default: predefined mapping)
-%       header_lines: integer - number of header lines to skip (default: 0)
-%       start_time  : string in 'HH:MM:SS' format (default: nan) - reference start time
-%       epoch_dur   : scalar - epoch duration in seconds (default: 30)
-%       plot_on     : logical - if true, plot hypnogram with hypnoplot (default: true)
 %
-%   Output:
+%   Name-Value Pairs:
+%       'stage_vals'  : 1x7 cell array of strings or cell arrays with stage strings (default: predefined mapping)
+%       'header_lines': integer - number of header lines to skip (default: 0)
+%       'start_time'  : string in 'HH:MM:SS' format (default: nan) - reference start time
+%       'epoch_dur'   : scalar - epoch duration in seconds (default: 30)
+%       'plot_on'     : logical - if true, plot hypnogram with hypnoplot (default: true)
+%
+%   Outputs:
 %       staging     : struct with fields:
 %                       - times : vector of times in seconds
 %                       - vals  : vector of stage values (0-6)
 %       annotations : struct with fields (only for unmatched entries):
 %                       - times      : vector of times in seconds
 %                       - annotation : cell array of annotation strings
-%
-%   Notes:
-%       Sleep stage notation:
-%           Artifact = 6, Wake = 5, REM = 4, N1 = 3, N2 = 2, N3 = 1, Unknown = 0
-%       If the time column is ascending integers, it is treated as epoch numbers.
-%       If numeric but not perfect integers, it is treated as seconds.
-%       In both numeric cases, if the first entry = 0, times are shifted by epoch_dur
-%       so that the first epoch time is at epoch_dur seconds.
-%
-%   Example:
-%       [staging, annotations] = read_staging('hypnogram.csv', 1, 2);
-%
-%   Copyright 2025
 
     % ---------------- Default stage mappings ----------------
     default_stage_vals = {{'art', 'artifact', 'A', '6'}, ...
@@ -44,28 +33,38 @@ function [staging, annotations] = read_staging(file_name, time_col, stage_col, s
                           {'N3', 'Stage 3', '3'}, ...
                           {'Unk', 'U', 'Unknown', '0'}};
 
-    % ---------------- Input checks ----------------
-    if nargin < 4 || isempty(stage_vals) || (isnumeric(stage_vals) && isnan(stage_vals))
-        stage_vals = default_stage_vals;
+    % ---------------- Input parser ----------------
+    p = inputParser;
+    p.KeepUnmatched = true;
+
+    addRequired(p, 'file_name', @(x) ischar(x) || isstring(x));
+    addRequired(p, 'time_col', @(x) isnumeric(x) && isscalar(x) && x>0 && mod(x,1)==0);
+    addRequired(p, 'stage_col', @(x) isnumeric(x) && isscalar(x) && x>0 && mod(x,1)==0);
+
+    addOptional(p, 'stage_vals', default_stage_vals, @(x) iscell(x) && numel(x)==7);
+    addOptional(p, 'header_lines', 0, @(x) isnumeric(x) && isscalar(x) && x>=0);
+    addOptional(p, 'start_time', NaN, @(x) ischar(x) || isstring(x) || isnan(x));
+    addOptional(p, 'epoch_dur', 30, @(x) isnumeric(x) && isscalar(x) && x>0);
+    addOptional(p, 'plot_on', true, @(x) islogical(x) && isscalar(x));
+
+    parse(p, varargin{:});
+
+    file_name   = p.Results.file_name;
+    time_col    = p.Results.time_col;
+    stage_col   = p.Results.stage_col;
+    stage_vals  = p.Results.stage_vals;
+    header_lines= p.Results.header_lines;
+    start_time  = p.Results.start_time;
+    epoch_dur   = p.Results.epoch_dur;
+    plot_on     = p.Results.plot_on;
+
+    % ---------------- Validate stage_vals ----------------
+    if iscell(stage_vals) && numel(stage_vals)==7 && ~iscell(stage_vals{1})
+        stage_vals = cellfun(@(x) {x}, stage_vals, 'UniformOutput', false);
     end
-    if nargin < 5 || isempty(header_lines), header_lines = 0; end
-    if nargin < 6 || isempty(start_time), start_time = NaN; end
-    if nargin < 7 || isempty(epoch_dur), epoch_dur = 30; end
-    if nargin < 8 || isempty(plot_on), plot_on = true; end
 
     if ~exist(file_name, 'file')
         error('File "%s" does not exist.', file_name);
-    end
-    if ~(isscalar(time_col) && isnumeric(time_col) && time_col > 0)
-        error('time_col must be a positive integer.');
-    end
-    if ~(isscalar(stage_col) && isnumeric(stage_col) && stage_col > 0)
-        error('stage_col must be a positive integer.');
-    end
-
-    % Convert simple 1x7 string array into cell-of-cells
-    if iscell(stage_vals) && length(stage_vals) == 7 && ~iscell(stage_vals{1})
-        stage_vals = cellfun(@(x) {x}, stage_vals, 'UniformOutput', false);
     end
 
     % ---------------- Read CSV ----------------
@@ -113,9 +112,6 @@ function times_seconds = convert_time_to_seconds(time_data, start_time, epoch_du
     % ---------- Case 1: perfect ascending integers ----------
     if all(~isnan(numeric_data)) && all(mod(numeric_data,1)==0) && all(diff(numeric_data) >= 0)
         vals = numeric_data(:);
-        if vals(1) == 0
-            vals = vals + 1; % shift so first epoch ends at epoch_dur
-        end
         start_sec = parse_start_time(start_time);
         times_seconds = start_sec + vals * epoch_dur;
         return;
@@ -124,9 +120,6 @@ function times_seconds = convert_time_to_seconds(time_data, start_time, epoch_du
     % ---------- Case 2: numeric but not pure integers (seconds) ----------
     if all(~isnan(numeric_data))
         vals = numeric_data(:);
-        if vals(1) == 0
-            vals = vals + epoch_dur; % shift so first epoch ends at epoch_dur
-        end
         start_sec = parse_start_time(start_time);
         times_seconds = start_sec + vals;
         return;
@@ -159,8 +152,11 @@ function times_seconds = convert_time_to_seconds(time_data, start_time, epoch_du
         end
     end
 
-    % Default: relative to first timestamp
     first_valid = raw_seconds(find(~isnan(raw_seconds),1,'first'));
+    if isempty(first_valid)
+        error('Dimension mismatch. Check for header lines to remove');
+    end
+    
     times_seconds = raw_seconds - first_valid;
 end
 
