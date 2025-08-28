@@ -12,7 +12,7 @@ function [staging, annotations] = read_staging(varargin)
 %   Name-Value Pairs:
 %       'stage_vals'  : 1x7 cell array of strings or cell arrays with stage strings (default: predefined mapping)
 %       'header_lines': integer - number of header lines to skip (default: 0)
-%       'start_time'  : string 'HH:MM:SS' or numeric scalar in seconds (default: nan)
+%       'start_time'  : string in 'HH:MM:SS' format (default: nan) - reference start time
 %       'epoch_dur'   : scalar - epoch duration in seconds (default: 30)
 %       'plot_on'     : logical - if true, plot hypnogram with hypnoplot (default: true)
 %
@@ -43,20 +43,20 @@ function [staging, annotations] = read_staging(varargin)
 
     addOptional(p, 'stage_vals', default_stage_vals, @(x) isempty(x) || (iscell(x) && numel(x)==7));
     addOptional(p, 'header_lines', 0, @(x) isnumeric(x) && isscalar(x) && x>=0);
-    addOptional(p, 'start_time', NaN, @(x) isnumeric(x) && isscalar(x) || ischar(x) || isstring(x) || isnan(x));
+    addOptional(p, 'start_time', NaN, @(x) ischar(x) || isstring(x) || isnan(x));
     addOptional(p, 'epoch_dur', 30, @(x) isnumeric(x) && isscalar(x) && x>0);
     addOptional(p, 'plot_on', true, @(x) islogical(x) && isscalar(x));
 
     parse(p, varargin{:});
 
-    file_name    = p.Results.file_name;
-    time_col     = p.Results.time_col;
-    stage_col    = p.Results.stage_col;
-    stage_vals   = p.Results.stage_vals;
-    header_lines = p.Results.header_lines;
-    start_time   = p.Results.start_time;
-    epoch_dur    = p.Results.epoch_dur;
-    plot_on      = p.Results.plot_on;
+    file_name   = p.Results.file_name;
+    time_col    = p.Results.time_col;
+    stage_col   = p.Results.stage_col;
+    stage_vals  = p.Results.stage_vals;
+    header_lines= p.Results.header_lines;
+    start_time  = p.Results.start_time;
+    epoch_dur   = p.Results.epoch_dur;
+    plot_on     = p.Results.plot_on;
 
     if isempty(stage_vals)
         stage_vals = default_stage_vals;
@@ -124,11 +124,7 @@ function times_seconds = convert_time_to_seconds(time_data, start_time, epoch_du
     % ---------- Case 2: numeric but not pure integers (seconds) ----------
     if all(~isnan(numeric_data))
         vals = numeric_data(:);
-        if isnumeric(start_time) && isscalar(start_time)
-            start_sec = start_time;
-        else
-            start_sec = parse_start_time(start_time);
-        end
+        start_sec = parse_start_time(start_time);
         times_seconds = start_sec + vals;
         return;
     end
@@ -170,10 +166,6 @@ end
 
 % ============================================================
 function start_sec = parse_start_time(start_time)
-    if isnumeric(start_time) && isscalar(start_time)
-        start_sec = start_time;
-        return;
-    end
     if ischar(start_time) || isstring(start_time)
         st = regexp(char(start_time), '^(\d{1,2}):(\d{2}):(\d{2})$', 'tokens');
         if ~isempty(st)
@@ -185,4 +177,34 @@ function start_sec = parse_start_time(start_time)
         end
     end
     start_sec = 0;
+end
+
+% ============================================================
+function adjusted_times = handle_midnight_crossover(raw_seconds)
+    adjusted_times = raw_seconds;
+    day_sec = 24*3600;
+    for i = 2:length(adjusted_times)
+        if adjusted_times(i) < adjusted_times(i-1) - 12*3600
+            adjusted_times(i:end) = adjusted_times(i:end) + day_sec;
+        end
+    end
+end
+
+% ============================================================
+function [stage_values, unmatched_idx] = process_stage_data(stage_data, stage_vals)
+    stage_numbers = [6, 5, 4, 3, 2, 1, 0]; % Artifact → Unknown
+    stage_values = nan(size(stage_data));   % start unassigned
+
+    for stage_idx = 1:length(stage_vals)
+        strs = lower(string(stage_vals{stage_idx}));
+        for i = 1:length(stage_data)
+            cur = lower(string(stage_data(i)));
+            if any(contains(cur, strs))
+                stage_values(i) = stage_numbers(stage_idx);
+            end
+        end
+    end
+
+    unmatched_idx = find(isnan(stage_values));
+    stage_values(unmatched_idx) = 6; % default unmatched to Artifact
 end
