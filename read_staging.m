@@ -11,7 +11,7 @@ function [staging, annotations] = read_staging(file_name, time_col, stage_col, s
 %       stage_vals  : 1x7 cell array of strings or cell arrays with stage strings (default: predefined mapping)
 %       header_lines: integer - number of header lines to skip (default: 0)
 %       start_time  : string in 'HH:MM:SS' format (default: nan) - reference start time
-%       epoch_dur   : scalar - epoch duration in seconds, if time is epoch index (default: 30)
+%       epoch_dur   : scalar - epoch duration in seconds (default: 30)
 %       plot_on     : logical - if true, plot hypnogram with hypnoplot (default: true)
 %
 %   Output:
@@ -25,9 +25,10 @@ function [staging, annotations] = read_staging(file_name, time_col, stage_col, s
 %   Notes:
 %       Sleep stage notation:
 %           Artifact = 6, Wake = 5, REM = 4, N1 = 3, N2 = 2, N3 = 1, Unknown = 0
-%       If the time column is ascending integers, it is treated as epoch numbers,
-%       and converted into seconds using epoch_dur. In this case, the first stage
-%       time is aligned at start_time + epoch_dur (or epoch_dur if no start_time given).
+%       If the time column is ascending integers, it is treated as epoch numbers.
+%       If numeric but not perfect integers, it is treated as seconds.
+%       In both numeric cases, if the first entry = 0, times are shifted by epoch_dur
+%       so that the first epoch time is at epoch_dur seconds.
 %
 %   Example:
 %       [staging, annotations] = read_staging('hypnogram.csv', 1, 2);
@@ -55,7 +56,6 @@ function [staging, annotations] = read_staging(file_name, time_col, stage_col, s
     if ~exist(file_name, 'file')
         error('File "%s" does not exist.', file_name);
     end
-
     if ~(isscalar(time_col) && isnumeric(time_col) && time_col > 0)
         error('time_col must be a positive integer.');
     end
@@ -68,11 +68,9 @@ function [staging, annotations] = read_staging(file_name, time_col, stage_col, s
         stage_vals = cellfun(@(x) {x}, stage_vals, 'UniformOutput', false);
     end
 
-       % ---------------- Read CSV ----------------
-    % Read everything as strings so nothing is dropped
+    % ---------------- Read CSV ----------------
     raw_data = readcell(file_name, 'Delimiter', ',', 'NumHeaderLines', header_lines);
 
-    % Validate enough columns exist
     num_cols = size(raw_data, 2);
     if time_col > num_cols
         error('time_col (%d) exceeds number of columns (%d).', time_col, num_cols);
@@ -112,33 +110,29 @@ end
 function times_seconds = convert_time_to_seconds(time_data, start_time, epoch_dur)
     numeric_data = str2double(time_data);
 
-    % Case 1: epoch numbers (ascending integers)
+    % ---------- Case 1: perfect ascending integers ----------
     if all(~isnan(numeric_data)) && all(mod(numeric_data,1)==0) && all(diff(numeric_data) >= 0)
-        epoch_nums = numeric_data(:);
-        if ischar(start_time) || isstring(start_time)
-            st = regexp(char(start_time), '^(\d{1,2}):(\d{2}):(\d{2})$', 'tokens');
-            if ~isempty(st)
-                hh = str2double(st{1}{1});
-                mm = str2double(st{1}{2});
-                ss = str2double(st{1}{3});
-                start_sec = hh*3600 + mm*60 + ss;
-            else
-                start_sec = 0;
-            end
-        else
-            start_sec = 0;
+        vals = numeric_data(:);
+        if vals(1) == 0
+            vals = vals + 1; % shift so first epoch ends at epoch_dur
         end
-        times_seconds = start_sec + epoch_nums * epoch_dur;
+        start_sec = parse_start_time(start_time);
+        times_seconds = start_sec + vals * epoch_dur;
         return;
     end
 
-    % Case 2: general numeric values
+    % ---------- Case 2: numeric but not pure integers (seconds) ----------
     if all(~isnan(numeric_data))
-        times_seconds = numeric_data;
+        vals = numeric_data(:);
+        if vals(1) == 0
+            vals = vals + epoch_dur; % shift so first epoch ends at epoch_dur
+        end
+        start_sec = parse_start_time(start_time);
+        times_seconds = start_sec + vals;
         return;
     end
 
-    % Case 3: HH:MM:SS strings
+    % ---------- Case 3: time strings ----------
     raw_seconds = nan(size(time_data));
     for i = 1:numel(time_data)
         tstr = strtrim(char(time_data(i)));
@@ -168,6 +162,21 @@ function times_seconds = convert_time_to_seconds(time_data, start_time, epoch_du
     % Default: relative to first timestamp
     first_valid = raw_seconds(find(~isnan(raw_seconds),1,'first'));
     times_seconds = raw_seconds - first_valid;
+end
+
+% ============================================================
+function start_sec = parse_start_time(start_time)
+    if ischar(start_time) || isstring(start_time)
+        st = regexp(char(start_time), '^(\d{1,2}):(\d{2}):(\d{2})$', 'tokens');
+        if ~isempty(st)
+            hh = str2double(st{1}{1});
+            mm = str2double(st{1}{2});
+            ss = str2double(st{1}{3});
+            start_sec = hh*3600 + mm*60 + ss;
+            return;
+        end
+    end
+    start_sec = 0;
 end
 
 % ============================================================
