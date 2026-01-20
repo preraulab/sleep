@@ -64,11 +64,11 @@ default_colors = [    0.9000    0.9000    0.9000; ...
 
 p = inputParser;
 
-addRequired(p,'stage_times',@(x)validateattributes(x,{'numeric'},{'nonempty'}));
+addRequired(p,'stage_times',@(x)validateattributes(x,{'numeric','datetime'},{'nonempty'}));
 addRequired(p,'stage_vals',@(x)validateattributes(x,{'numeric'},{'nonempty'}));
 addOptional(p,'Artifacts',[],@(x)validateattributes(x,{'logical','numeric'},{'nonempty'}));
 addOptional(p,'Fs',[],@(x)validateattributes(x,{'numeric'},{'nonempty','positive'}));
-addOptional(p,'ArtifactTimes',[],@(x)validateattributes(x,{'numeric'},{'nonempty'}));
+addOptional(p,'ArtifactTimes',[],@(x)validateattributes(x,{'numeric','datetime'},{'nonempty'}));
 addOptional(p,'HypnogramLabels',{'Undef','N3','N2','N1','REM','Wake','Art'},@iscell);
 addOptional(p,'StageColors',default_colors,@(x)validateattributes(x,{'numeric'},{'nonempty'}));
 addOptional(p,'PlotBuffer', .3, @(x)validateattributes(x,{'numeric'},{'nonempty','positive'}));
@@ -115,7 +115,12 @@ if ~isempty(artifacts)
 end
 
 %Adds a 30s epoch at the end for plotting
-stage_times(end+1) = stage_times(end)+30;
+if isdatetime(stage_times(1))
+    stage_times(end+1) = stage_times(end)+seconds(30);
+else
+    stage_times(end+1) = stage_times(end)+30;
+end
+
 stage_vals(end+1) = stage_vals(end);
 
 %Simplify vector
@@ -190,6 +195,9 @@ uistack(sh,'top');
 if ~isempty(artifacts)
     if ~isempty(Fs) && isempty(artifact_times)
         artifact_times = (0:length(artifacts)-1)/Fs;
+        if isdatetime(stage_times(1))
+            artifact_times = stage_times(1) + seconds(artifact_times);
+        end
     end
 
     art_stage_inds = stage_vals == 6;
