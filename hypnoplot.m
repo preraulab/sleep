@@ -68,7 +68,7 @@ addRequired(p,'stage_times',@(x)validateattributes(x,{'numeric','datetime'},{'no
 addRequired(p,'stage_vals',@(x)validateattributes(x,{'numeric'},{'nonempty'}));
 addOptional(p,'Artifacts',[],@(x)validateattributes(x,{'logical','numeric'},{'nonempty'}));
 addOptional(p,'Fs',[],@(x)validateattributes(x,{'numeric'},{'nonempty','positive'}));
-addOptional(p,'ArtifactTimes',[],@(x)validateattributes(x,{'numeric','datetime'},{'nonempty'}));
+addOptional(p,'ArtifactTimes',[],@(x)validateattributes(x,{'numeric','datetime'+},{'nonempty'}));
 addOptional(p,'HypnogramLabels',{'Undef','N3','N2','N1','REM','Wake','Art'},@iscell);
 addOptional(p,'StageColors',default_colors,@(x)validateattributes(x,{'numeric'},{'nonempty'}));
 addOptional(p,'PlotBuffer', .3, @(x)validateattributes(x,{'numeric'},{'nonempty','positive'}));
