@@ -1,57 +1,81 @@
-function sh = hypnoplot(stage_times,stage_vals,varargin)
-% HYPNOPLOT Make a pretty plot of a hypnogram
+function sh = hypnoplot(varargin)
+%HYPNOPLOT  Plot a hypnogram of sleep stage values over time
 %
 %   Usage:
-%       hyp_handle = hypnoplot(stage_times, stage_vals, <optional arguments>)
+%       hyp_handle = hypnoplot(stage_times, stage_vals, 'Name', Value, ...)
+%       hyp_handle = hypnoplot(ax, stage_times, stage_vals, 'Name', Value, ...)
 %
-%   Input:
-%       stage_times: 1xN vector of stage times
-%             NOTE: Assumes each stage time indicates stage ONSET time, with an epoch ranging from
-%             stage_times(t) to stage_times(t+1)
-%       stage_vals: 1xN vector of stage values (6: Artifact 5: Wake, 4:REM, 3:N1, 2:N2, 1:N3, 0:Undefined)
-%             NOTE: Stage are labeled in the plot order of the y-axis, so N1 = 3 and N3 = 1
+%   Inputs:
+%       stage_times : 1xN double - stage onset times -- required
+%       stage_vals  : 1xN double - stage values (6=Artifact, 5=Wake, 4=REM, 3=N1, 2=N2, 1=N3, 0=Undefined) -- required
+%       ax          : axes handle - target axes (default: gca)
 %
-%   Optional Name-Value Pairs:
-%       'Artifacts': 1xT logical vector of artifacts, must include EITHER Fs or ArtifactTimes
-%       'Fs': Sampling frequency for artifacts.
-%             NOTE: Assumes time starts at 0, which is the time of the first stage
-%       'ArtifactTimes': 1xT vector of time values for artifacts
-%       'HypnogramLabels': 1x7 cell, stage name labels, default: {'Undef','N3','N2','N1','REM','Wake','Art'}
-%       'LabelPos': 'top' or 'left', label position, default: 'left'
-%       'StageColors': 7x3 double
-%       'GroupNREMColors': logical, use one color for NREM vs different colors for N1-3, default: true
-%       'PlotBuffer': double, axis gap on top/bottom, default: 0.3
+%   Name-Value Pairs:
+%       'Artifacts'       : 1xT logical - artifact mask (requires 'Fs' or 'ArtifactTimes') (default: logical([]))
+%       'Fs'              : double - sampling frequency for the artifact vector (default: [])
+%       'ArtifactTimes'   : 1xT double - time values for the artifact vector (default: [])
+%       'TimesUnit'       : char - 'seconds' or 'hours' (default: 'seconds')
+%       'EpochSize'       : double - epoch duration in TimesUnit (default: 30 for seconds, 30/3600 for hours)
+%       'HypnogramLabels' : 1x7 cell - stage name labels (default: {'Undef','N3','N2','N1','REM','Wake','Art'})
+%       'LabelPos'        : char - 'top' or 'left' label position (default: 'left')
+%       'StageColors'     : 7x3 double - RGB rows per stage (default: built-in palette)
+%       'GroupNREMColors' : logical - single color for NREM vs per-stage (default: true)
+%       'PlotBuffer'      : double - axis gap above/below (default: 0.3)
 %
-%   Output:
-%       hyp_handle: handle to stairs object for hypnogram
+%   Outputs:
+%       hyp_handle : stairs handle for the hypnogram
+%
+%   Notes:
+%       - Each stage_times(t) is treated as the ONSET of an epoch spanning
+%         stage_times(t) to stage_times(t+1).
+%       - Stages are laid out along the y-axis in the order: Undef(0), N3(1),
+%         N2(2), N1(3), REM(4), Wake(5), Artifact(6).
+%       - When 'Artifacts' is given, 'Fs' (assumes artifacts start at t=0)
+%         or 'ArtifactTimes' must also be provided.
 %
 %   Example:
-%       %Simulate a simple hypnogram
 %       stage_vals = [0 0 0 5 5 5 4 3 2 2 2 1 2 1 2 3 5 5 5 1 5 1 2 5 3 2 1 4 4 4 5 4 0 3 2 1 1 5 5 5 0 0 0];
-%       stage_vals(stage_vals <2) = 5;
-%       stage_times = (0:length(stage_vals)-1)*30;
-%
-%       %Simulate some artifacts
+%       stage_vals(stage_vals < 2) = 5;
+%       stage_times = (0:length(stage_vals)-1) * 30;
 %       Fs = 200;
-%       dt = 1/Fs;
-%       artifact_times = 0:dt:max(stage_times);
-%       artifacts = rand(size(artifact_times))<.002;
+%       artifact_times = 0:1/Fs:max(stage_times);
+%       artifacts = rand(size(artifact_times)) < .002;
 %
 %       figure
 %       subplot(211)
 %       hypnoplot(stage_times, stage_vals, 'Artifacts', artifacts, 'Fs', Fs);
 %       subplot(212)
-%       hypnoplot(stage_times, stage_vals,'HypnogramLabels', {'U','3','2','1','R','W','A'},'LabelPos','top', 'Artifacts', artifacts, 'ArtifactTimes', artifact_times);
+%       hypnoplot(stage_times, stage_vals, 'HypnogramLabels', {'U','3','2','1','R','W','A'}, ...
+%                 'LabelPos', 'top', 'Artifacts', artifacts, 'ArtifactTimes', artifact_times);
+%
+%   See also: read_staging, stairs
+%
+%   ∿∿∿  Prerau Laboratory MATLAB Codebase · sleepEEG.org  ∿∿∿
+%        Source: https://github.com/preraulab/labcode_main
 
-%   Copyright 2024 Prerau Lab - http://www.sleepEEG.org
-%% ********************************************************************
 
+%% Parse optional leading axes handle
+if ~isempty(varargin) && isscalar(varargin{1}) && ...
+        (isa(varargin{1},'matlab.graphics.axis.Axes') || ...
+         (ishghandle(varargin{1}) && strcmp(get(varargin{1},'Type'),'axes')))
+    ax = varargin{1};
+    varargin(1) = [];
+else
+    ax = gca;
+end
+
+%% Parse input
 %Check for old input
-if isstruct(stage_times)
-    hypnoplot(stage_times.time, stage_times.stage, varargin{2:end});
+if ~isempty(varargin) && isstruct(varargin{1})
+    stage_struct = varargin{1};
+    sh = hypnoplot(ax, stage_struct.time, stage_struct.stage, varargin{2:end});
     warning('Avoid using stage structure for input. Use separate time and stage variables')
     return;
 end
+
+stage_times = varargin{1};
+stage_vals  = varargin{2};
+varargin    = varargin(3:end);
 
 %Default colors for plot
 default_colors = [    0.9000    0.9000    0.9000; ...
@@ -64,63 +88,76 @@ default_colors = [    0.9000    0.9000    0.9000; ...
 
 p = inputParser;
 
-addRequired(p,'stage_times',@(x)validateattributes(x,{'numeric','datetime'},{'nonempty'}));
-addRequired(p,'stage_vals',@(x)validateattributes(x,{'numeric'},{'nonempty'}));
-addOptional(p,'Artifacts',[],@(x)validateattributes(x,{'logical','numeric'},{'nonempty'}));
-addOptional(p,'Fs',[],@(x)validateattributes(x,{'numeric'},{'nonempty','positive'}));
-addOptional(p,'ArtifactTimes',[],@(x)validateattributes(x,{'numeric','datetime'},{'nonempty'}));
-addOptional(p,'HypnogramLabels',{'Undef','N3','N2','N1','REM','Wake','Art'},@iscell);
-addOptional(p,'StageColors',default_colors,@(x)validateattributes(x,{'numeric'},{'nonempty'}));
-addOptional(p,'PlotBuffer', .3, @(x)validateattributes(x,{'numeric'},{'nonempty','positive'}));
-addOptional(p,'LabelPos', 'left', @ischar);
-addOptional(p,'GroupNREMColors',true, @islogical);
+addRequired(p, 'stage_times', @(x) validateattributes(x, {'numeric'}, {'real','finite','nondecreasing','vector'}));
+addRequired(p, 'stage_vals', @(x) validateattributes(x, {'numeric'}, {'real','finite','nonnegative','vector'}));
+addOptional(p, 'Artifacts', logical([]), @(x) validateattributes(x,{'logical'},{'real','finite','2d'}));
+addOptional(p, 'Fs', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x)));
+addOptional(p, 'ArtifactTimes', [], @(x) validateattributes(x,{'numeric'},{'real','finite','2d'}));
+addOptional(p, 'TimesUnit', 'seconds', @(x) any(validatestring(x, {'seconds', 'hours'})));
+addOptional(p, 'EpochSize', 0, @(x) validateattributes(x,{'numeric'},{'real','finite','positive','scalar'}));
+addOptional(p, 'HypnogramLabels', {'Undef','N3','N2','N1','REM','Wake','Art'}, @(x) validateattributes(x,{'cell'},{'numel',7}));
+addOptional(p, 'StageColors', default_colors, @(x) validateattributes(x,{'numeric'},{'real','finite','nonnegative','ncols',3}));
+addOptional(p, 'PlotBuffer', .3, @(x) validateattributes(x,{'numeric'},{'real','finite','positive','scalar'}));
+addOptional(p, 'LabelPos', 'left', @(x) any(validatestring(x, {'top', 'left'})));
+addOptional(p, 'GroupNREMColors', true, @(x) validateattributes(x, {'logical', 'numeric'}, {'binary'}));
 
 parse(p,stage_times,stage_vals,varargin{:});
 
+% Manually assign variables
+artifacts = p.Results.Artifacts;
+Fs = p.Results.Fs;
+artifact_times = p.Results.ArtifactTimes;
+TimesUnit = p.Results.TimesUnit;
+EpochSize = p.Results.EpochSize;
 HypnogramLabels = p.Results.HypnogramLabels;
 StageColors = p.Results.StageColors;
 PlotBuffer = p.Results.PlotBuffer;
 GroupNREMColors = p.Results.GroupNREMColors;
 LabelPos = p.Results.LabelPos;
-artifacts = p.Results.Artifacts;
-Fs = p.Results.Fs;
-artifact_times = p.Results.ArtifactTimes;
 
-
-%Do additional input checks
-if iscolumn(stage_vals)
-    stage_vals = stage_vals';
+%% Do additional input checks
+if iscolumn(stage_vals) %Force stage_vals to be a row vector for the horizontal concatenation
+    stage_vals = transpose(stage_vals);
 end
 
-if iscolumn(stage_times)
-    stage_times = stage_times';
+if iscolumn(stage_times) %Force stage_times to be a row vector for the horizontal concatenation
+    stage_times = transpose(stage_times);
 end
 
-%Make stage vals double
+%Make stage_vals as double class
 if ~isa(stage_vals,'double')
     stage_vals = double(stage_vals);
 end
 
-assert(isequal(size(stage_times),size(stage_vals)),'time and stage must be the same dimensions')
-assert(size(StageColors,2)==3,'Colors must be an N x 3 matrix')
-assert(length(HypnogramLabels)==7,'Hypnogram labels must be a 1 x 7 cell of strings - Undefined, N3, N2, N1, R, W, Artifiact')
-assert(ismember(lower(LabelPos),{'left','top'}),'LabelPos must be "left" or "top"')
+assert(length(stage_times) == length(stage_vals), 'time and stage must be the same length.')
 
+%Set default EpochSize
+if EpochSize == 0
+    switch TimesUnit
+        case 'seconds'
+            EpochSize = 30;
+        case 'hours'
+            EpochSize = 30/3600;
+    end
+end
+
+%Handle additional artifacts input that is separate from the 6=Art in stage_vals
 if ~isempty(artifacts)
     assert(xor(~isempty(Fs), ~isempty(artifact_times)), 'Must provide either sampling frequency or time vector for artifacts')
-
+    if iscolumn(artifacts) %Force artifacts to be a row vector for the horizontal concatenation
+        artifacts = transpose(artifacts);
+    end
     if ~isempty(artifact_times)
+        if iscolumn(artifact_times) %Force artifact_times to be a row vector for the interp1
+            artifact_times = transpose(artifact_times);
+        end
         assert(length(artifact_times) == length(artifacts), 'Artifact vector and times must be the same dimension');
     end
 end
 
-%Adds a 30s epoch at the end for plotting
-if isdatetime(stage_times(1))
-    stage_times(end+1) = stage_times(end)+seconds(30);
-else
-    stage_times(end+1) = stage_times(end)+30;
-end
-
+%% Make the hypnoplot
+%Add another epoch at the end for plotting
+stage_times(end+1) = stage_times(end)+EpochSize;
 stage_vals(end+1) = stage_vals(end);
 
 %Simplify vector
@@ -134,7 +171,7 @@ stage_vals(stage_vals<0 | isnan(stage_vals)) = 0;
 stage_vals(stage_vals>6) = 6;
 
 %Plot the hypnogram
-sh = stairs(stage_times,stage_vals,'k','linewidth',2);
+sh = stairs(ax,stage_times,stage_vals,'k','linewidth',2);
 
 %Adjust plot to include no stage and artifacts
 val_min = min([stage_vals,1]); %Always go down to at least N3
@@ -144,15 +181,15 @@ val_max = max(stage_vals);
 min_y = val_min - PlotBuffer;
 max_y = val_max + PlotBuffer;
 
-hold on;
+hold(ax,'on');
 
 if strcmpi(LabelPos,'left')
     if ~isempty(artifacts)
         labels = HypnogramLabels(val_min+1:val_max+1);
         labels = [{'Art'} labels(:)'];
-        set(gca,'ytick',[val_min-1 val_min:val_max],'yticklabel',labels,'xticklabel','');
+        set(ax,'ytick',[val_min-1 val_min:val_max],'yticklabel',labels,'xticklabel','');
     else
-        set(gca,'ytick',val_min:val_max,'yticklabel',HypnogramLabels(val_min+1:val_max+1),'xticklabel','');
+        set(ax,'ytick',val_min:val_max,'yticklabel',HypnogramLabels(val_min+1:val_max+1),'xticklabel','');
     end
 else
     %Get just the stages that exist
@@ -163,14 +200,15 @@ else
         stg = stage_list(ss);
         first_stage = find(stage_vals==stg,1,"first");
 
-        text(stage_times(first_stage),max_y,HypnogramLabels{stg+1},'VerticalAlignment','baseline','HorizontalAlignment','center');
+        text(ax,stage_times(first_stage),max_y,HypnogramLabels{stg+1},'VerticalAlignment','baseline','HorizontalAlignment','center');
     end
     if isempty(artifacts)
-        set(gca,'yticklabel','')
+        set(ax,'yticklabel','')
     else
-        set(gca,'YTick',val_min-1,'YTickLabel','Art')
+        set(ax,'YTick',val_min-1,'YTickLabel','Art')
     end
 end
+ax.YAxis.TickLength = [0 0];
 
 if GroupNREMColors %Merge all NREM
     stage_vals(stage_vals==1 | stage_vals == 3) = 2;
@@ -186,24 +224,21 @@ for stage_num = 0:6 %Loop through all stages
     d = ones(1,length(a))*max_y;
 
     %Plot shaded rectangle
-    fill([a;b;b;a],[c;c;d;d], StageColors(stage_num + 1,:),'edgecolor','none')
+    fill(ax,[a;b;b;a],[c;c;d;d], StageColors(stage_num + 1,:),'edgecolor','none')
 end
 %Keep hypnogram trace on top
 uistack(sh,'top');
 
-%Plot the artifacts on the bottom
+%% Plot the additional artifacts input vector on the bottom
 if ~isempty(artifacts)
     if ~isempty(Fs) && isempty(artifact_times)
-        artifact_times = (0:length(artifacts)-1)/Fs;
-        if isdatetime(stage_times(1))
-            artifact_times = stage_times(1) + seconds(artifact_times);
-        end
+        artifact_times = (0:length(artifacts)-1)/Fs; % this is a row vector
     end
 
     art_stage_inds = stage_vals == 6;
     if any(art_stage_inds)
         stage_vals(stage_vals ~= 6) = 0;
-        art_stage = interp1(stage_times, stage_vals, artifact_times,'previous','extrap');
+        art_stage = interp1(single(stage_times), single(stage_vals), artifact_times, 'previous', 'extrap');
         art_stage(isnan(art_stage)) = 0;
         artifacts = artifacts | art_stage;
     end
@@ -218,13 +253,13 @@ if ~isempty(artifacts)
     %Get epoch times
     a = artifact_times(inds);
     b = artifact_times(inds+1);
-    c = ones(1,length(a))*(val_min-1);
+    c = ones(1,length(a))*(val_min-2);
     d = ones(1,length(a))*min_y;
 
     %Plot shaded rectangle
-    fill([a;b;b;a],[c;c;d;d], StageColors(6 + 1,:),'edgecolor','k')
+    fill(ax,[a;b;b;a],[c;c;d;d], StageColors(6 + 1,:),'edgecolor','k')
 end
 
+%%
 %Set limits
-axis tight
-
+axis(ax,'tight')
