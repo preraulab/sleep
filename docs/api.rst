@@ -1,42 +1,44 @@
 API Reference
 =============
 
-Auto-generated reference for ``sleep``.
-
 Root
 ----
 
-.. mat:module:: .
+.. toctree::
+   :maxdepth: 1
 
-.. mat:autofunction:: extract_SW
-.. mat:autofunction:: hypnoplot
-.. mat:autofunction:: read_staging
-
-simulations
------------
-
-.. mat:module:: simulations
-
-.. mat:autofunction:: ECG_sim
+   api/extract_SW
+   api/hypnoplot
+   api/read_staging
 
 simulations/SleepEEGSim
 -----------------------
 
-.. mat:module:: simulations.SleepEEGSim
+.. toctree::
+   :maxdepth: 1
 
-.. mat:autofunction:: AperiodicEEG
-.. mat:autofunction:: LineNoise
-.. mat:autofunction:: MotionArtifacts
-.. mat:autofunction:: Oscillator
-.. mat:autofunction:: SleepEEGSim
-.. mat:autofunction:: SlowWaves
-.. mat:autofunction:: Spindles
+   api/AperiodicEEG
+   api/LineNoise
+   api/MotionArtifacts
+   api/Oscillator
+   api/SleepEEGSim
+   api/SlowWaves
+   api/Spindles
+
+simulations
+-----------
+
+.. toctree::
+   :maxdepth: 1
+
+   api/ECG_sim
 
 stage_comparisons
 -----------------
 
-.. mat:module:: stage_comparisons
+.. toctree::
+   :maxdepth: 1
 
-.. mat:autofunction:: ICC
-.. mat:autofunction:: kappa
+   api/ICC
+   api/kappa
 
