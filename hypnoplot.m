@@ -51,7 +51,6 @@ function sh = hypnoplot(varargin)
 %   See also: read_staging, stairs
 %
 %   ∿∿∿  Prerau Laboratory MATLAB Codebase · sleepEEG.org  ∿∿∿
-%        Source: https://github.com/preraulab/labcode_main
 
 
 %% Parse optional leading axes handle

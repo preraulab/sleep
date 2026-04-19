@@ -39,7 +39,6 @@ function [staging, annotations] = read_staging(varargin)
 %   See also: hypnoplot, readcell
 %
 %   ∿∿∿  Prerau Laboratory MATLAB Codebase · sleepEEG.org  ∿∿∿
-%        Source: https://github.com/preraulab/labcode_main
 
 % ---------------- Default stage mappings ----------------
 default_stage_vals = {{'art', 'artifact', 'A', '6'}, ...
