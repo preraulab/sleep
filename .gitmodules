@@ -1,3 +1,0 @@
-[submodule "simulations/SleepEEGSim"]
-	path = simulations/SleepEEGSim
-	url = git@github.com:preraulab/SleepEEGSim.git
