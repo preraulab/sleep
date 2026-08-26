@@ -256,7 +256,7 @@ if ~isempty(artifacts)
     d = ones(1,length(a))*min_y;
 
     %Plot shaded rectangle
-    fill(ax,[a;b;b;a],[c;c;d;d], StageColors(6 + 1,:),'edgecolor','k')
+    fill(ax,[a;b;b;a],[c;c;d;d], StageColors(6 + 1,:),'edgecolor','none')
 end
 
 %%
