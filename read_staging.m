@@ -13,6 +13,8 @@ function [staging, annotations] = read_staging(varargin)
 %       'stage_vals'  : 1x7 cell array of strings or cell arrays with stage strings (default: predefined mapping)
 %       'header_lines': integer - number of header lines to skip (default: 0)
 %       'start_time'  : string in 'HH:MM:SS' format for datestring input or seconds for epoch/time input (default: nan) - reference start time
+%       'record_duration' : scalar - length of the recording in seconds (default: nan). Used with 'start_time' and time
+%                       strings to refuse staging that begins before the recording does (see Notes)
 %       'delimiter'   : char - column delimitor (default: ',')
 %       'epoch_dur'   : scalar - epoch duration in seconds (default: 30)
 %       'plot_on'     : logical - if true, plot hypnogram with hypnoplot (default: true)
@@ -35,6 +37,15 @@ function [staging, annotations] = read_staging(varargin)
 %           3. Time in strings: if a valid time string (hour:minute:second) or
 %              full datetime string is detected, data are parsed as
 %              datetime values - start_time.
+%       Time strings carry no date. When the first staging time is an
+%       earlier clock time than start_time (recording starts 21:44, first
+%       scored epoch 01:55), the staging is read as starting the next
+%       day, here 4 h 11 min after the start. Staging that truly begins
+%       before the recording (start 21:44, first row 21:40) also has an
+%       earlier clock time, and read as the next day it lands almost 24 h
+%       in. When 'record_duration' is given and that point is at or past
+%       the end of the recording, an error is raised. Without
+%       'record_duration' the next-day reading is used.
 %
 %   See also: hypnoplot, readcell
 %
@@ -60,6 +71,7 @@ addRequired(p, 'stage_col', @(x) isnumeric(x) && isscalar(x) && x>0 && mod(x,1)=
 addOptional(p, 'stage_vals', default_stage_vals, @(x) isempty(x) || (iscell(x) && numel(x)==7));
 addOptional(p, 'header_lines', 0, @(x) isnumeric(x) && isscalar(x) && x>=0);
 addOptional(p, 'start_time', NaN, @(x) ischar(x) || isstring(x) || (isnumeric(x) && isscalar(x) && isnan(x)));
+addOptional(p, 'record_duration', NaN, @(x) isnumeric(x) && isscalar(x) && (isnan(x) || x>0));
 addOptional(p, 'delimiter', ',', @(x) ischar(x) || isstring(x));
 addOptional(p, 'epoch_dur', 30, @(x) isnumeric(x) && isscalar(x) && x>0);
 addOptional(p, 'plot_on', true, @(x) islogical(x) && isscalar(x));
@@ -72,6 +84,7 @@ stage_col   = p.Results.stage_col;
 stage_vals  = p.Results.stage_vals;
 header_lines= p.Results.header_lines;
 start_time  = p.Results.start_time;
+record_duration = p.Results.record_duration;
 delimiter   = p.Results.delimiter;
 epoch_dur   = p.Results.epoch_dur;
 plot_on     = p.Results.plot_on;
@@ -109,7 +122,7 @@ time_data  = string(raw_data(:, time_col));
 stage_data = string(raw_data(:, stage_col));
 
 % ---------------- Time conversion ----------------
-times_seconds = convert_time_to_seconds(time_data, start_time, epoch_dur);
+times_seconds = convert_time_to_seconds(time_data, start_time, epoch_dur, record_duration);
 
 % ---------------- Stage processing ----------------
 [stage_values, unmatched_idx] = process_stage_data(stage_data, stage_vals);
@@ -141,7 +154,7 @@ end
 end
 
 %Convert the time data to seconds
-function times_seconds = convert_time_to_seconds(time_data, start_time, epoch_dur)
+function times_seconds = convert_time_to_seconds(time_data, start_time, epoch_dur, record_duration)
 numeric_data = str2double(time_data);
 
 % ---------- Case 1: Epoch number in consecutive integers ----------
@@ -169,8 +182,27 @@ times_seconds = secs + dayOffset;
 
 %Check to see if there is a starting time and compute the offset
 if (ischar(start_time) || isstring(start_time)) && ~isempty(start_time)
-    start_offset = times_seconds(1) - seconds(timeofday(datetime(start_time)));
+    start_seconds = seconds(timeofday(datetime(start_time)));
+
+    % Next-day rule: a first staging time with an earlier clock time than
+    % the start is read as falling on the next day
+    first_is_before_start = times_seconds(1) < start_seconds;
+    if first_is_before_start
+        times_seconds = times_seconds + 86400;
+    end
+
+    start_offset = times_seconds(1) - start_seconds;
     assert(start_offset>=0,'Start time is later than first time point.')
+
+    % Staging that truly begins before the recording lands past the end of
+    % the recording when read as the next day
+    if first_is_before_start && ~isnan(record_duration) && start_offset >= record_duration
+        error('read_staging:StagingBeforeRecording', ...
+            ['The first staging time is earlier than the recording start time (%s). ' ...
+            'Read as the next day it would fall %.2f h after the start, past the end of the %.2f h recording. ' ...
+            'Staging cannot begin before the recording does: check the staging time column and the start time.'], ...
+            char(start_time), start_offset/3600, record_duration/3600);
+    end
 else
     start_offset = 0;
 end
